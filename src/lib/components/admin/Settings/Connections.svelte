@@ -3,23 +3,6 @@
 	import { createEventDispatcher, onMount, getContext, tick } from 'svelte';
 
 	const dispatch = createEventDispatcher();
-
-	import {
-		getOllamaConfig,
-		getOllamaUrls,
-		getOllamaVersion,
-		updateOllamaConfig,
-		updateOllamaUrls
-	} from '$lib/apis/ollama';
-	import {
-		getOpenAIConfig,
-		getOpenAIKeys,
-		getOpenAIModels,
-		getOpenAIUrls,
-		updateOpenAIConfig,
-		updateOpenAIKeys,
-		updateOpenAIUrls
-	} from '$lib/apis/openai';
 	import { toast } from 'svelte-sonner';
 	import Switch from '$lib/components/common/Switch.svelte';
 	import Spinner from '$lib/components/common/Spinner.svelte';
@@ -29,42 +12,30 @@
 
 	const i18n = getContext('i18n');
 
+	// Hardcode api url and key here
+	let OPENAI_API_BASE_URLS = ['http://host.docker.internal:9099'];
+	let OPENAI_API_KEYS = ['0p3n-w3bu!'];
+
+	// Since we don't want to dynamically update or fetch them, just set these:
+	let OLLAMA_BASE_URLS = [];
+	let pipelineUrls = {};
+	let ENABLE_OPENAI_API = true;  // or false, depending on if you want it enabled
+	let ENABLE_OLLAMA_API = false; // if not using Ollama
+
+
 	const getModels = async () => {
 		const models = await _getModels(localStorage.token);
 		return models;
 	};
 
-	// External
-	let OLLAMA_BASE_URLS = [''];
-
-	let OPENAI_API_KEYS = [''];
-	let OPENAI_API_BASE_URLS = [''];
-
-	let pipelineUrls = {};
-
-	let ENABLE_OPENAI_API = null;
-	let ENABLE_OLLAMA_API = null;
-
-	const verifyOpenAIHandler = async (idx) => {
-		OPENAI_API_BASE_URLS = OPENAI_API_BASE_URLS.map((url) => url.replace(/\/$/, ''));
-
-		OPENAI_API_BASE_URLS = await updateOpenAIUrls(localStorage.token, OPENAI_API_BASE_URLS);
-		OPENAI_API_KEYS = await updateOpenAIKeys(localStorage.token, OPENAI_API_KEYS);
-
-		const res = await getOpenAIModels(localStorage.token, idx).catch((error) => {
-			toast.error(error);
-			return null;
-		});
-
-		if (res) {
-			toast.success($i18n.t('Server connection verified'));
-			if (res.pipelines) {
-				pipelineUrls[OPENAI_API_BASE_URLS[idx]] = true;
-			}
+	onMount(async () => {
+		// If the user is admin, and you previously fetched configs,
+		// you can skip that. Since values are hardcoded, just set them:
+		if ($user.role === 'admin') {
+			// If you need to display pipelines:
+			pipelineUrls[OPENAI_API_BASE_URLS[0]] = true;
 		}
-
-		await models.set(await getModels());
-	};
+	});
 
 	const verifyOllamaHandler = async (idx) => {
 		OLLAMA_BASE_URLS = OLLAMA_BASE_URLS.filter((url) => url !== '').map((url) =>

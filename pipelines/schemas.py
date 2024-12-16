@@ -3,7 +3,7 @@ from pydantic import BaseModel, ConfigDict
 
 class OpenAIChatMessage(BaseModel):
     role: str
-    content: str | List
+    content: str
 
     model_config = ConfigDict(extra="allow")
 

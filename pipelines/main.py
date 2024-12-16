@@ -665,12 +665,8 @@ async def generate_openai_chat_completion(form_data: OpenAIChatCompletionForm):
         )
 
     def job():
-        print(form_data.model)
-
         pipeline = app.state.PIPELINES[form_data.model]
         pipeline_id = form_data.model
-
-        print(pipeline_id)
 
         if pipeline["type"] == "manifold":
             manifold_id, pipeline_id = pipeline_id.split(".", 1)
