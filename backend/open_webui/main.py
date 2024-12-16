@@ -29,6 +29,10 @@ from open_webui.apps.openai.main import (
     get_all_models as get_openai_models,
 )
 
+from open_webui.apps.cosmic.main import (
+    app as cosmic_app
+)
+
 from open_webui.apps.retrieval.main import app as retrieval_app
 from open_webui.apps.retrieval.utils import get_rag_context, rag_template
 
@@ -887,11 +891,10 @@ async def inspect_websocket(request: Request, call_next):
 app.mount("/ws", socket_app)
 app.mount("/ollama", ollama_app)
 app.mount("/openai", openai_app)
-
+app.mount("/cosmic", cosmic_app)
 app.mount("/images/api/v1", images_app)
 app.mount("/audio/api/v1", audio_app)
 app.mount("/retrieval/api/v1", retrieval_app)
-
 app.mount("/api/v1", webui_app)
 
 
