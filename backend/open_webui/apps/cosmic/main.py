@@ -5,6 +5,7 @@ import logging
 import mimetypes
 import os
 import shutil
+import dotenv
 
 import uuid
 from datetime import datetime
@@ -33,8 +34,6 @@ from open_webui.apps.retrieval.web.serper import search_serper
 from open_webui.apps.retrieval.web.serply import search_serply
 from open_webui.apps.retrieval.web.serpstack import search_serpstack
 from open_webui.apps.retrieval.web.tavily import search_tavily
-# from subprocess import check_output
-# from signal import SIGKILL
 
 from open_webui.apps.retrieval.utils import (
     get_embedding_function,
@@ -209,19 +208,17 @@ class ConfigUpdateForm(BaseModel):
     chess: ChessConfig
     openai: OpenAIConfig
 
-# def get_pid(name):
-#     return check_output(["pidof", name])
 
 @app.post("/config/update")
 async def update_cosmic_config(form_data: ConfigUpdateForm, user=Depends(get_admin_user)):
     # Update all the variables to backend/open_webui/apps/cosmic/config_default.yaml.
     # This will be used by CoSMIC pipeline.
     # Step 1: read config.yaml
-    shared_dir = "/app/backend/shared"
-    os.makedirs(shared_dir, exist_ok=True)
+    shared_config_dir = "/app/backend/shared"
+    os.makedirs(shared_config_dir, exist_ok=True)
 
     config_path = "/app/backend/open_webui/apps/cosmic/config.yaml"
-    config_path_updated = os.path.join(shared_dir, "config_updated.yaml")
+    config_path_updated = os.path.join(shared_config_dir, "config_updated.yaml")
 
     try:
         with open(config_path, "r") as file:  # was config_default_path
@@ -242,24 +239,23 @@ async def update_cosmic_config(form_data: ConfigUpdateForm, user=Depends(get_adm
     config_data["rag"]["retrieve_score_threshold"] = form_data.rag.retrieve_score_threshold
     config_data["rag"]["vector_db_path"] = form_data.rag.vector_db_path
     config_data["chess"]["stockfish_path"] = form_data.chess.stockfish_path
-    config_data["openai"]["api_key"] = form_data.openai.api_key
+
+    # Save OpenAI API key to .env instead of displaying in config_updated.yaml.
+    env_path = "/app/backend/.env"
+
+    # This might not be useful as it is in docker container.
+    os.environ["OPENAI_API_KEY"] = form_data.openai.api_key
+
+    # Change the root's .env which is shared with .env in this backend container.
+    dotenv.set_key(env_path, "OPENAI_API_KEY", form_data.openai.api_key)
+
+    app.config = config_data
 
     try:
         with open(config_path_updated, "w") as file:
             yaml.safe_dump(config_data, file)
     except Exception as e:
         return {"error": f"Failed to save config: {str(e)}"}
-
-    app.config = config_data
-    # pipeline_pid = get_pid("uvicorn")
-    # app.config["openai"]["api_key"] = pipeline_pid
-
-    # Reload pipeline.
-    # os.kill(pid, SIGKILL)
-
-    # os.chdir("/your/path/here")
-    # subprocess.call("sleep.sh", shell=True)
-    # os.chdir("/your/path/here")
 
     return app.config
 

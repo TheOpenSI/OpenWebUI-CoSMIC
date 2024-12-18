@@ -1,5 +1,4 @@
-# pipelines/cosmic_pipeline.py
-import sys, os
+import sys, os, dotenv
 
 # Add CoSMIC to the system path
 ROOT = f"{os.path.dirname(os.path.abspath(__file__))}/../.."
@@ -25,15 +24,21 @@ class Pipeline:
 
     def __init__(self):
         self.name = "OpenSI-CoSMIC"
-        self.valves = self.Valves(**{"OPENAI_API_KEY": os.getenv("OPENAI_API_KEY", "")})
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        root = f"{current_dir}/../.."
+        self.root = f"{os.path.dirname(os.path.abspath(__file__))}/../.."
+        self.config_path = os.path.join(self.root, "shared/config_updated.yaml")
+        self.env_path = os.path.join(self.root, ".env")
+        self.config_modify_timestamp = str(os.path.getmtime(self.config_path))
+        self.MAX_QUERIES_PER_USER = 5
 
-        config_path = os.path.join(
-            root, 
-            "shared/config_updated.yaml"
-        )
-        self.opensi_cosmic = OpenSICoSMIC(config_path=config_path)
+        # Set up OPENAI_API_KEY globally through root's .env.
+        envs = dotenv.dotenv_values(self.env_path)
+        self.openai_api_key = envs["OPENAI_API_KEY"]
+        os.environ["OPENAI_API_KEY"] = self.openai_api_key
+
+        # Set OPENAI_API_KEY first before constructing OpenSICoSMIC since this config will
+        # be directly used in OpenSICoSMIC().
+        self.opensi_cosmic = OpenSICoSMIC(config_path=self.config_path)
+        self.valves = self.Valves(**{"OPENAI_API_KEY": os.getenv("OPENAI_API_KEY", "")})
 
     async def on_startup(self):
         print(f"on_startup:{__name__}")
@@ -43,17 +48,32 @@ class Pipeline:
         self.opensi_cosmic.quit()
 
     def pipe(
-        self, user_message: str, model_id: str, messages: List[dict], body: dict
-    ) -> Union[str, Generator, Iterator]:
+        self,
+        user_message: str,
+        model_id: str,
+        messages: List[dict],
+        body: dict
+    ):
+        current_config_modify_timestamp = str(os.path.getmtime(self.config_path))
+        current_openai_api_key = dotenv.dotenv_values(self.env_path)["OPENAI_API_KEY"]
+
+        if (current_config_modify_timestamp != self.config_modify_timestamp) \
+            or (current_openai_api_key != self.openai_api_key):
+            self.opensi_cosmic.quit()
+            self.openai_api_key = current_openai_api_key
+            self.config_modify_timestamp = current_config_modify_timestamp
+            os.environ["OPENAI_API_KEY"] = self.openai_api_key
+            self.opensi_cosmic = OpenSICoSMIC(config_path=self.config_path)
+            print('Reconstruct OpenSICoSMIC due to changed configs.')
 
         # Extract user_id from body. Adjust if user_id is available elsewhere.
-        user_id = body.get("user_id", "default_user")
+        user_id = body["user"]["id"]
+        user_role = body["user"]["role"]
 
         # Check how many queries this user has already made
         current_count = self.user_queries_count.get(user_id, 0)
-        MAX_QUERIES_PER_USER = 5
 
-        if current_count >= MAX_QUERIES_PER_USER:
+        if (user_role != "admin") and (current_count >= self.MAX_QUERIES_PER_USER):
             # Return a message indicating the limit has been reached
             return "You have reached the maximum number of queries allowed."
 
@@ -61,8 +81,7 @@ class Pipeline:
         self.user_queries_count[user_id] = current_count + 1
 
         # Proceed as normal
-        answer, raw_answer, score = self.opensi_cosmic(user_message)
+        answer = self.opensi_cosmic(user_message)[0]
+        if answer is None: answer = 'Successfully!'
 
-        if answer is None:
-            answer = 'Successfully!'
         return answer
