@@ -1,4 +1,4 @@
-import sys, os, dotenv
+import sys, os, dotenv, shutil
 
 # Add CoSMIC to the system path
 ROOT = f"{os.path.dirname(os.path.abspath(__file__))}/../.."
@@ -11,7 +11,7 @@ else:
     from src.opensi_cosmic import OpenSICoSMIC
 
 from pydantic import BaseModel
-from typing import List, Union, Generator, Iterator
+from typing import List
 
 
 class Pipeline:
@@ -26,6 +26,11 @@ class Pipeline:
         self.name = "OpenSI-CoSMIC"
         self.root = f"{os.path.dirname(os.path.abspath(__file__))}/../.."
         self.config_path = os.path.join(self.root, "shared/config_updated.yaml")
+
+        if not os.path.exists(self.config_path):
+            config_path = os.path.join(self.root, "shared/config.yaml")
+            shutil.copyfile(config_path, self.config_path)
+
         self.env_path = os.path.join(self.root, ".env")
         self.config_modify_timestamp = str(os.path.getmtime(self.config_path))
         self.MAX_QUERIES_PER_USER = 5

@@ -1,18 +1,17 @@
 # TODO: Merge this with the webui_app and make it a single app
 
-import json, yaml, sentence_transformers
+import yaml, sentence_transformers
 import logging
-import mimetypes
 import os
 import shutil
 import dotenv
+import shutil
 
 import uuid
 from datetime import datetime
-from pathlib import Path
-from typing import Iterator, Optional, Sequence, Union
+from typing import Optional
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, status
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -22,7 +21,6 @@ from open_webui.apps.retrieval.vector.connector import VECTOR_DB_CLIENT
 from open_webui.apps.retrieval.loaders.main import Loader
 
 # Web search engines
-from open_webui.apps.retrieval.web.main import SearchResult
 from open_webui.apps.retrieval.web.utils import get_web_loader
 from open_webui.apps.retrieval.web.brave import search_brave
 from open_webui.apps.retrieval.web.duckduckgo import search_duckduckgo
@@ -95,10 +93,7 @@ from open_webui.config import (
 from open_webui.constants import ERROR_MESSAGES
 from open_webui.env import SRC_LOG_LEVELS, DEVICE_TYPE, DOCKER
 from open_webui.utils.misc import (
-    calculate_sha256,
-    calculate_sha256_string,
-    extract_folders_after_data_docs,
-    sanitize_filename,
+    calculate_sha256_string
 )
 from open_webui.utils.utils import get_admin_user, get_verified_user
 
@@ -168,11 +163,6 @@ app.state.config.RAG_WEB_SEARCH_CONCURRENT_REQUESTS = RAG_WEB_SEARCH_CONCURRENT_
 app.config = {}
 
 
-@app.get("/config")
-async def get_cosmic_config(user=Depends(get_admin_user)):
-    return app.config
-
-
 # Commented by Danny:
 # All these configs must be given to
 # Open-WebUi/src/lib/components/admin/Settings/Configs.svelte;
@@ -203,10 +193,52 @@ class ConfigUpdateForm(BaseModel):
     doc_directory: str
     document_path: str
     service: int
+    sameasabove: bool
     query_analyser: QueryQnalyserConfig
     rag: RAGConfig
     chess: ChessConfig
     openai: OpenAIConfig
+
+
+def get_config_path():
+    shared_config_dir = "/app/backend/shared"
+    os.makedirs(shared_config_dir, exist_ok=True)
+
+    config_path = os.path.join(shared_config_dir, "config.yaml")
+    config_path_updated = os.path.join(shared_config_dir, "config_updated.yaml")
+
+    if not os.path.exists(config_path_updated):
+        shutil.copyfile(config_path, config_path_updated)
+
+    return config_path_updated
+
+
+def get_env():
+    env_path = "/app/backend/.env"
+    if not os.path.exists(env_path): return None
+    env = dotenv.dotenv_values(env_path)
+
+    return env
+
+
+@app.get("/config")
+async def get_cosmic_config(user=Depends(get_admin_user)):
+    # Get config.
+    if app.config == {}:
+        config_path = get_config_path()
+
+        with open(config_path, "r") as file:
+            app.config = yaml.safe_load(file)
+
+    # Get .env.
+    env = get_env()
+
+    if env is not None:
+        app.config["OPENAI_API_KEY"] = env["OPENAI_API_KEY"]
+    else:
+        app.config["OPENAI_API_KEY"] = "0p3n-w3bu!"
+
+    return app.config
 
 
 @app.post("/config/update")
@@ -214,17 +246,10 @@ async def update_cosmic_config(form_data: ConfigUpdateForm, user=Depends(get_adm
     # Update all the variables to backend/open_webui/apps/cosmic/config_default.yaml.
     # This will be used by CoSMIC pipeline.
     # Step 1: read config.yaml
-    shared_config_dir = "/app/backend/shared"
-    os.makedirs(shared_config_dir, exist_ok=True)
+    config_path = get_config_path()
 
-    config_path = "/app/backend/open_webui/apps/cosmic/config.yaml"
-    config_path_updated = os.path.join(shared_config_dir, "config_updated.yaml")
-
-    try:
-        with open(config_path, "r") as file:  # was config_default_path
-            config_data = yaml.safe_load(file)
-    except FileNotFoundError:
-        return {"error": "Default config file not found"}
+    with open(config_path, "r") as file:  # was config_default_path
+        config_data = yaml.safe_load(file)
 
     # Step 2: update the values, and save it as config_default.yaml.
     config_data["llm_name"] = form_data.llm_name
@@ -239,6 +264,7 @@ async def update_cosmic_config(form_data: ConfigUpdateForm, user=Depends(get_adm
     config_data["rag"]["retrieve_score_threshold"] = form_data.rag.retrieve_score_threshold
     config_data["rag"]["vector_db_path"] = form_data.rag.vector_db_path
     config_data["chess"]["stockfish_path"] = form_data.chess.stockfish_path
+    config_data["sameasabove"] = form_data.sameasabove
 
     # Save OpenAI API key to .env instead of displaying in config_updated.yaml.
     env_path = "/app/backend/.env"
@@ -250,12 +276,11 @@ async def update_cosmic_config(form_data: ConfigUpdateForm, user=Depends(get_adm
     dotenv.set_key(env_path, "OPENAI_API_KEY", form_data.openai.api_key)
 
     app.config = config_data
+    app.config["OPENAI_API_KEY"] = form_data.openai.api_key
 
-    try:
-        with open(config_path_updated, "w") as file:
-            yaml.safe_dump(config_data, file)
-    except Exception as e:
-        return {"error": f"Failed to save config: {str(e)}"}
+    # Save updated configs to config_updated.yaml, instead of overwriting config.yaml.
+    with open(config_path, "w") as file:
+        yaml.safe_dump(config_data, file)
 
     return app.config
 

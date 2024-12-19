@@ -5,16 +5,8 @@
 	const dispatch = createEventDispatcher();
 
 	import {
-		getQuerySettings,
 		updateQuerySettings,
-		resetVectorDB,
-		getEmbeddingConfig,
-		updateEmbeddingConfig,
-		getRerankingConfig,
-		updateRerankingConfig,
-		resetUploadDir,
-		getRAGConfig,
-		updateRAGConfig,
+		resetVectorDB
 	} from '$lib/apis/retrieval';
 
 	import {
@@ -22,12 +14,9 @@
 		updateCoSMICConfig
 	} from '$lib/apis/cosmic';
 
-	import { knowledge, models } from '$lib/stores';
-	import { getKnowledgeItems } from '$lib/apis/knowledge';
-	import { uploadDir, deleteAllFiles, deleteFileById } from '$lib/apis/files';
+	import { deleteAllFiles } from '$lib/apis/files';
 	import ResetUploadDirConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
 	import ResetVectorDBConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
-	import SensitiveInput from '$lib/components/common/SensitiveInput.svelte';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 
 	const i18n = getContext('i18n');
@@ -57,45 +46,21 @@
 	let sameAsAbove = false;
 	let isGPTModel = generalLLM.startsWith("gpt"); // Detect if the selected model is a GPT model
 	let isOllamaSelected = generalLLM === "ollama"; // Detect if 'ollama' is selected
+	let isQueryAnalyserGPTModel = queryAnalyserLLM.startsWith("gpt");
 	let isQueryAnalyserOllamaSelected = queryAnalyserLLM == "ollama";
     let ollamaModelName = ""; // Variable to hold the name of the Ollama model to download
+	let QueryAnalyserOllamaModelName = "";
     let openaiApiKey = ""; // OpenAI API Key
-	let huggingfaceToken = ""; // Hugging Face Token
 	let documentFilePath = ""; // Default value for the document path
 	let stockfishPath = ""; // Default value for the Stockfish path
 
-	// Variables to track the selected LLM type
-	// let isQueryAnalyserGPTModel = queryAnalyserLLM.startsWith("gpt");
-    // let isQueryAnalyserOllamaSelected = queryAnalyserLLM === "ollama";
-
 	// Default value for Retrieve Score Threshold
-	let CoSMICLLMName = '';
-	let CoSMICQueryAnalyserLLMName = '';
     let CoSMICRAGTopK = 1;
 	let CoSMICRAGRetrieveScoreThreshold = 0.7;
-	let CoSMICVectorDBPath = "";
-	let CoSMICStockfishPath = "";
 
 	// new code block ends here
-	let scanDirLoading = false;
-	let updateEmbeddingModelLoading = false;
-	let updateRerankingModelLoading = false;
 	let showResetConfirm = false;
 	let showResetUploadDirConfirm = false;
-	let embeddingEngine = '';
-	let embeddingModel = '';
-	let rerankingModel = '';
-	let fileMaxSize = null;
-	let fileMaxCount = null;
-	let contentExtractionEngine = 'default';
-	let tikaServerUrl = '';
-	let showTikaServerUrl = false;
-	let chunkSize = 0;
-	let chunkOverlap = 0;
-	let pdfExtractImages = true;
-	let OpenAIKey = '';
-	let OpenAIUrl = '';
-	let OpenAIBatchSize = 1;
 
 	let querySettings = {
 		template: '',
@@ -107,13 +72,10 @@
 
 	// Watch for "Same as Above" checkbox
     $: if (sameAsAbove) {
+		isQueryAnalyserGPTModel = isGPTModel;
 		isQueryAnalyserOllamaSelected = isOllamaSelected;
-		
-		if (isQueryAnalyserOllamaSelected) {
-			queryAnalyserLLM = `${generalLLM}:${ollamaModelName}`;
-		} else {
-			queryAnalyserLLM = generalLLM;
-		}
+		queryAnalyserLLM = generalLLM;
+		QueryAnalyserOllamaModelName = ollamaModelName;
         queryAnalyserQuantized = generalQuantized;
     }
 
@@ -134,6 +96,15 @@
 		} catch (error) {
 			console.error("Error updating LLM selection:", error);
 		}
+	}
+
+	// Update function for LLM selection
+	async function updateQueryAnalyserLLMSelection() {
+		// Detect if the selected LLM is a GPT model
+		isQueryAnalyserGPTModel = queryAnalyserLLM.startsWith("gpt");
+
+		// Detect if the selected LLM is explicitly 'ollama'
+		isQueryAnalyserOllamaSelected = queryAnalyserLLM === "ollama";
 	}
 
 
@@ -181,42 +152,12 @@
 	}
 
 
-    // Save the selected path
-	async function updateDocumentPath() {
-		if (!documentFilePath) {
-			console.error("No document path selected.");
-			return;
-		}
-		try {
-			await updateQuerySettings({ document_file_path: documentFilePath });
-			console.log("Document File Path updated successfully:", documentFilePath);
-		} catch (error) {
-			console.error("Error updating document file path:", error);
-		}
-	}
-
-
 	// Function to handle Stockfish file selection
 	function handleStockfishSelection(event) {
 		const files = event.target.files;
 		if (files && files.length > 0) {
 			stockfishPath = files[0].path || files[0].name; // Use the file path or name
 			console.log("Selected Stockfish path:", stockfishPath);
-		}
-	}
-
-
-	// Save the Stockfish path
-	async function updateStockfishPath() {
-		if (!stockfishPath) {
-			console.error("No Stockfish path selected.");
-			return;
-		}
-		try {
-			await updateQuerySettings({ stockfish_path: stockfishPath });
-			console.log("Stockfish Path updated successfully:", stockfishPath);
-		} catch (error) {
-			console.error("Error updating Stockfish path:", error);
 		}
 	}
 
@@ -263,149 +204,39 @@
 	}
 
 
-	// new code block ends here
-	const embeddingModelUpdateHandler = async () => {
-		if (embeddingEngine === '' && embeddingModel.split('/').length - 1 > 1) {
-			toast.error(
-				$i18n.t(
-					'Model filesystem path detected. Model shortname is required for update, cannot continue.'
-				)
-			);
-			return;
-		}
-		if (embeddingEngine === 'ollama' && embeddingModel === '') {
-			toast.error(
-				$i18n.t(
-					'Model filesystem path detected. Model shortname is required for update, cannot continue.'
-				)
-			);
-			return;
-		}
-
-		if (embeddingEngine === 'openai' && embeddingModel === '') {
-			toast.error(
-				$i18n.t(
-					'Model filesystem path detected. Model shortname is required for update, cannot continue.'
-				)
-			);
-			return;
-		}
-
-		if ((embeddingEngine === 'openai' && OpenAIKey === '') || OpenAIUrl === '') {
-			toast.error($i18n.t('OpenAI URL/Key required.'));
-			return;
-		}
-
-		console.log('Update embedding model attempt:', embeddingModel);
-
-		updateEmbeddingModelLoading = true;
-		const res = await updateEmbeddingConfig(localStorage.token, {
-			embedding_engine: embeddingEngine,
-			embedding_model: embeddingModel,
-			...(embeddingEngine === 'openai'
-				? {
-						openai_config: {
-							key: OpenAIKey,
-							url: OpenAIUrl,
-							batch_size: OpenAIBatchSize
-						}
-					}
-				: {})
-		}).catch(async (error) => {
-			toast.error(error);
-			await setEmbeddingConfig();
-			return null;
-		});
-		updateEmbeddingModelLoading = false;
-
-		if (res) {
-			console.log('embeddingModelUpdateHandler:', res);
-			if (res.status === true) {
-				toast.success($i18n.t('Embedding model set to "{{embedding_model}}".', res), {
-					duration: 1000 * 10
-				});
-			}
-		}
-	};
-
-
-	const rerankingModelUpdateHandler = async () => {
-		console.log('Update reranking model attempt:', rerankingModel);
-
-		updateRerankingModelLoading = true;
-		const res = await updateRerankingConfig(localStorage.token, {
-			reranking_model: rerankingModel
-		}).catch(async (error) => {
-			toast.error(error);
-			await setRerankingConfig();
-			return null;
-		});
-		updateRerankingModelLoading = false;
-
-		if (res) {
-			console.log('rerankingModelUpdateHandler:', res);
-			if (res.status === true) {
-				if (rerankingModel === '') {
-					toast.success($i18n.t('Reranking model disabled', res), {
-						duration: 1000 * 10
-					});
-				} else {
-					toast.success($i18n.t('Reranking model set to "{{reranking_model}}"', res), {
-						duration: 1000 * 10
-					});
-				}
-			}
-		}
-	};
-
-
 	const submitHandler = async () => {
-		await embeddingModelUpdateHandler();
-
-		if (querySettings.hybrid) {
-			await rerankingModelUpdateHandler();
-		}
-
-		if (contentExtractionEngine === 'tika' && tikaServerUrl === '') {
-			toast.error($i18n.t('Tika Server URL required.'));
-			return;
-		}
-
-		const res = await updateRAGConfig(localStorage.token, {
-			pdf_extract_images: pdfExtractImages,
-			file: {
-				max_size: fileMaxSize === '' ? null : fileMaxSize,
-				max_count: fileMaxCount === '' ? null : fileMaxCount
-			},
-			chunk: {
-				chunk_overlap: chunkOverlap,
-				chunk_size: 1234
-			},
-			content_extraction: {
-				engine: contentExtractionEngine,
-				tika_server_url: tikaServerUrl
-			}
-		});
+		let general_llm_name = generalLLM;
 
 		if (isOllamaSelected) {
-			generalLLM = `${generalLLM}:${ollamaModelName}`;
+			general_llm_name = `${generalLLM}:${ollamaModelName}`;
+		}
+
+	    let query_analyser_llm_name = queryAnalyserLLM;
+
+		if (isQueryAnalyserOllamaSelected) {
+			if (sameAsAbove) {
+				query_analyser_llm_name = general_llm_name;
+			} else {
+				query_analyser_llm_name = `${queryAnalyserLLM}:${QueryAnalyserOllamaModelName}`;
+			}
 		}
 
 		await updateCoSMICConfig(localStorage.token, {
-			llm_name: generalLLM,
+			llm_name: general_llm_name,
 			is_quantized: generalQuantized,
 			seed: generalSeed,
 			doc_directory: documentFilePath,  // TODO
 			document_path: documentFilePath,  // TODO
 			service: service,
+			sameasabove: sameAsAbove,
 			query_analyser: {
-				llm_name: queryAnalyserLLM,
+				llm_name: query_analyser_llm_name,
 				is_quantized: queryAnalyserQuantized
 			},
 			rag: {
 				top_k: CoSMICRAGTopK,
 				retrieve_score_threshold: CoSMICRAGRetrieveScoreThreshold,
-				vector_db_path: documentFilePath // TODO
+				vector_db_path: "" // TODO
 			},
 			chess: {
 				stockfish_path: stockfishPath
@@ -421,57 +252,40 @@
 	};
 
 
-	const setEmbeddingConfig = async () => {
-		const embeddingConfig = await getEmbeddingConfig(localStorage.token);
-
-		if (embeddingConfig) {
-			embeddingEngine = embeddingConfig.embedding_engine;
-			embeddingModel = embeddingConfig.embedding_model;
-
-			OpenAIKey = embeddingConfig.openai_config.key;
-			OpenAIUrl = embeddingConfig.openai_config.url;
-			OpenAIBatchSize = embeddingConfig.openai_config.batch_size ?? 1;
-		}
-	};
-
-
-	const setRerankingConfig = async () => {
-		const rerankingConfig = await getRerankingConfig(localStorage.token);
-
-		if (rerankingConfig) {
-			rerankingModel = rerankingConfig.reranking_model;
-		}
-	};
-
-
-	const toggleHybridSearch = async () => {
-		querySettings.hybrid = !querySettings.hybrid;
-		querySettings = await updateQuerySettings(localStorage.token, querySettings);
-	};
-
-
 	onMount(async () => {
-		await setEmbeddingConfig();
-		await setRerankingConfig();
+		const cosmic_configs = await getCoSMICConfig(localStorage.token);
 
-		querySettings = await getQuerySettings(localStorage.token);
-		await getRAGConfigxx(localStorage.token);
-		const res = await getRAGConfig(localStorage.token);
+		if (cosmic_configs) {
+			generalLLM = cosmic_configs["llm_name"];
 
-		if (res) {
-			pdfExtractImages = res.pdf_extract_images;
+            if (generalLLM.startsWith("ollama")) {
+				const words= generalLLM.split(':');
+				generalLLM = words[0];
+				ollamaModelName = words[1];
+			}
 
-			chunkSize = res.chunk.chunk_size;
-			chunkOverlap = res.chunk.chunk_overlap;
+			updateLLMSelection();
 
-			contentExtractionEngine = res.content_extraction.engine;
-			tikaServerUrl = res.content_extraction.tika_server_url;
-			showTikaServerUrl = contentExtractionEngine === 'tika';
+			generalQuantized = cosmic_configs["is_quantized"];
+			generalSeed = cosmic_configs["seed"];
+			documentFilePath = cosmic_configs["doc_directory"];
+			service = cosmic_configs["service"];
+			queryAnalyserLLM = cosmic_configs["query_analyser"]["llm_name"];
 
-			fileMaxSize = res?.file.max_size ?? '';
-			fileMaxCount = res?.file.max_count ?? '';
+			if (queryAnalyserLLM.startsWith("ollama")) {
+				const query_words= queryAnalyserLLM.split(':');
+				queryAnalyserLLM = query_words[0];
+				QueryAnalyserOllamaModelName = query_words[1];
+			}
 
-			await getCoSMICConfig(localStorage.token);
+			updateQueryAnalyserLLMSelection();
+
+			queryAnalyserQuantized = cosmic_configs["query_analyser"]["is_quantized"];
+			CoSMICRAGTopK = cosmic_configs["rag"]["topk"];
+			CoSMICRAGRetrieveScoreThreshold = cosmic_configs["rag"]["retrieve_score_threshold"];
+			stockfishPath = cosmic_configs["chess"]["stockfish_path"];
+		    sameAsAbove = cosmic_configs["sameasabove"];
+			openaiApiKey = cosmic_configs["OPENAI_API_KEY"];
 		}
 	});
 </script>
@@ -541,6 +355,7 @@
 								{/each}
 							</select>
 						</div>
+					</div>
 
 					<!-- OpenAI API Key Section -->
 					{#if isGPTModel}
@@ -569,10 +384,10 @@
 								for="ollama-model-name"
 								class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
 							>
-								Pull a model from 
-								<a 
-									href="https://ollama.com/library" 
-									target="_blank" 
+								Pull a model from
+								<a
+									href="https://ollama.com/library"
+									target="_blank"
 									class="text-blue-600 hover:underline dark:text-blue-400"
 								>
 									Ollama.com
@@ -587,7 +402,6 @@
 								placeholder="Enter the name of the Ollama model to download"
 							/>
 							<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-								
 							</p>
 						</div>
 					{/if}
@@ -632,26 +446,26 @@
 							class="block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
 						/>
 					</div>
-				</div>
 
-				<!-- Service Selection Section -->
-				<div class="mb-4">
-					<label
-						for="service-selection"
-						class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
-					>
-						Select a Service
-					</label>
-					<select
-						id="service-selection"
-						bind:value={service}
-						class="block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
-					>
-						{#each serviceOptions as option}
-							<option value={option.value}>{option.label}</option>
-						{/each}
-					</select>
-				</div>
+					<!-- Service Selection Section -->
+					<div class="mb-4">
+						<label
+							for="service-selection"
+							class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
+						>
+							Select a Service
+						</label>
+						<select
+							id="service-selection"
+							bind:value={service}
+							class="block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
+						>
+							{#each serviceOptions as option}
+								<option value={option.value}>{option.label}</option>
+							{/each}
+						</select>
+					</div>
+				</section>
 			</section>
 
 			<!-- Query Analyser Section -->
@@ -668,19 +482,82 @@
 						<label class="mb-1.5 text-sm font-medium">Same as Above</label>
 					</div>
 
-					<!-- Chose LLM -->
-					<div>
-						<label class="mb-1.5 text-sm font-medium text-gray-900 dark:text-gray-300">Choose an LLM</label>
-						<select
-							class="w-full rounded-lg py-2 px-4 text-sm bg-gray-50 dark:text-gray-300 dark:bg-gray-850 outline-none"
-							bind:value={queryAnalyserLLM}
-							disabled={sameAsAbove}
-						>
-							<option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
-							<option value="gpt-4o">gpt-4o</option>
-							<option value="ollama">ollama</option>
-						</select>
+					<!-- Choose LLM -->
+					<div class="mb-4">
+						<label
+							for="query-analyser-llm-select"
+							class="mb-1 text-sm font-medium text-gray-900 dark:text-gray-300">
+								Choose an LLM
+						</label>
+						<div class="flex w-full">
+							<select
+								id="query-analyser-llm-select"
+								bind:value={queryAnalyserLLM}
+								on:change={updateQueryAnalyserLLMSelection}
+								disabled={sameAsAbove}
+								class="w-full rounded-lg py-2 px-4 text-sm bg-gray-50 dark:text-gray-300 dark:bg-gray-850 outline-none"
+							>
+								{#each llmOptions as llm}
+									<option
+										value={llm}
+										class="bg-gray-100 dark:bg-gray-700"
+									>
+										{llm}
+									</option>
+								{/each}
+							</select>
+						</div>
 					</div>
+
+					<!-- OpenAI API Key Section -->
+					{#if isQueryAnalyserGPTModel && !isGPTModel}
+						<div class="mb-4">
+							<label
+								for="openai-api-key"
+								class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
+							>
+								OpenAI API Key (required for GPT models and will be securely stored)
+							</label>
+							<input
+								id="openai-api-key"
+								type="password"
+								bind:value={openaiApiKey}
+								on:change={updateOpenAIKey}
+								disabled={sameAsAbove}
+								class="block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
+								placeholder="Enter your OpenAI API Key"
+							/>
+						</div>
+					{/if}
+
+					<!-- Ollama Model Input Section -->
+					{#if isQueryAnalyserOllamaSelected}
+						<div class="mb-4">
+							<label
+								for="query-analyser-ollama-model-name"
+								class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
+							>
+								Pull a model from
+								<a
+									href="https://ollama.com/library"
+									target="_blank"
+									class="text-blue-600 hover:underline dark:text-blue-400"
+								>
+									Ollama.com
+								</a>
+							</label>
+							<input
+								id="query-analyser-ollama-model-name"
+								type="text"
+								bind:value={QueryAnalyserOllamaModelName}
+								disabled={sameAsAbove}
+								class="block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
+								placeholder="Enter the name of the Ollama model to download"
+							/>
+							<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+							</p>
+						</div>
+					{/if}
 
 					<!-- Quantized -->
 					<div class="mb-4">
