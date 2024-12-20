@@ -1,13 +1,15 @@
 import sys, os, dotenv, shutil
 
 # Add CoSMIC to the system path
-ROOT = f"{os.path.dirname(os.path.abspath(__file__))}/../.."
+ROOT = os.path.abspath(f"{os.path.dirname(os.path.abspath(__file__))}/../..")
 
 if os.path.exists(f"{ROOT}/../CoSMIC"):
     sys.path.append(f"{ROOT}/..")
+    IS_SUBMODULE = False
     from CoSMIC.src.opensi_cosmic import OpenSICoSMIC
 else:
     sys.path.append(f"{ROOT}/../..")
+    IS_SUBMODULE = True
     from src.opensi_cosmic import OpenSICoSMIC
 
 from pydantic import BaseModel
@@ -24,20 +26,29 @@ class Pipeline:
 
     def __init__(self):
         self.name = "OpenSI-CoSMIC"
-        self.root = f"{os.path.dirname(os.path.abspath(__file__))}/../.."
+        self.root = os.path.abspath(f"{os.path.dirname(os.path.abspath(__file__))}/../..")
         self.config_path = os.path.join(self.root, "shared/config_updated.yaml")
 
         if not os.path.exists(self.config_path):
             config_path = os.path.join(self.root, "shared/config.yaml")
             shutil.copyfile(config_path, self.config_path)
 
-        self.env_path = os.path.join(self.root, ".env")
+        if IS_SUBMODULE:
+            self.env_path = os.path.abspath(os.path.join(self.root, "../../.env"))
+        else:
+            self.env_path = os.path.join(self.root, ".env")
+
         self.config_modify_timestamp = str(os.path.getmtime(self.config_path))
         self.MAX_QUERIES_PER_USER = 5
 
         # Set up OPENAI_API_KEY globally through root's .env.
         envs = dotenv.dotenv_values(self.env_path)
-        self.openai_api_key = envs["OPENAI_API_KEY"]
+
+        if "OPENAI_API_KEY" in envs.keys():
+            self.openai_api_key = envs["OPENAI_API_KEY"]
+        else:
+            self.openai_api_key = ""
+
         os.environ["OPENAI_API_KEY"] = self.openai_api_key
 
         # Set OPENAI_API_KEY first before constructing OpenSICoSMIC since this config will
