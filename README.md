@@ -4,4 +4,10 @@ It is built on the open-source <a href="https://github.com/open-webui/open-webui
 with additional functionality introduced by OpenSI-CoSMIC.
 This repository serves as a submodule of OpenSI-CoSMIC, specifically in **[OpenSI-CoSMIC path]/modules/chatbot**.
 
+### How to Use
+```python
+touch .env   # then if OpenAI GPT API is used, please add OPENAI_API_KEY="[your API key]" in .env.
+bash run.sh
+```
+
 We would like the user to refer to <a href="https://github.com/TheOpenSI/CoSMIC" target="_blank">the official implementation of OpenSI-CoSMIC</a> for more details.
