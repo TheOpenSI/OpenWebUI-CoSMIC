@@ -55,6 +55,31 @@ class Pipeline:
         # be directly used in OpenSICoSMIC().
         self.opensi_cosmic = OpenSICoSMIC(config_path=self.config_path)
         self.valves = self.Valves(**{"OPENAI_API_KEY": os.getenv("OPENAI_API_KEY", "")})
+        self.openai_api_status = self.check_openai_key()
+
+    def check_openai_key(self):
+        llm_name = self.opensi_cosmic.config.llm_name
+        query_analyser_llm_name = self.opensi_cosmic.config.query_analyser.llm_name
+
+        is_llm_name_gpt = llm_name.find("gpt") > -1
+        is_query_analyser_llm_name_gpt = query_analyser_llm_name.find("gpt") > -1
+
+        llm_name_list = []
+        if is_llm_name_gpt: llm_name_list.append(llm_name)
+        if is_query_analyser_llm_name_gpt and (query_analyser_llm_name not in llm_name_list):
+            llm_name_list.append(query_analyser_llm_name)
+
+        count = len(llm_name_list)
+
+        if (count > 0) and (self.openai_api_key == ""):
+            if count == 1: answer = f"{llm_name_list[0]} is"
+            elif count == 2: answer = f"{llm_name_list[0]} and {llm_name_list[1]} are"
+            answer = f"Since {answer} used, please add valid OPENAI_API_KEY in " \
+                f".env OR via [account]/Settings/Admin Settings/Configs/[OpenAI API Key]."
+        else:
+            answer = ""
+
+        return answer
 
     async def on_startup(self):
         print(f"on_startup:{__name__}")
@@ -71,7 +96,7 @@ class Pipeline:
         body: dict
     ):
         current_config_modify_timestamp = str(os.path.getmtime(self.config_path))
-        current_openai_api_key = dotenv.dotenv_values(self.env_path)["OPENAI_API_KEY"]
+        current_openai_api_key = os.environ["OPENAI_API_KEY"]
 
         if (current_config_modify_timestamp != self.config_modify_timestamp) \
             or (current_openai_api_key != self.openai_api_key):
@@ -81,6 +106,7 @@ class Pipeline:
             os.environ["OPENAI_API_KEY"] = self.openai_api_key
             self.opensi_cosmic = OpenSICoSMIC(config_path=self.config_path)
             print('Reconstruct OpenSICoSMIC due to changed configs.')
+            self.openai_api_status = self.check_openai_key()
 
         # Extract user_id from body. Adjust if user_id is available elsewhere.
         user_id = body["user"]["id"]
@@ -97,7 +123,10 @@ class Pipeline:
         self.user_queries_count[user_id] = current_count + 1
 
         # Proceed as normal
-        answer = self.opensi_cosmic(user_message)[0]
-        if answer is None: answer = 'Successfully!'
+        if self.openai_api_status != "":
+            answer = self.openai_api_status
+        else:
+            answer = self.opensi_cosmic(user_message)[0]
+            if answer is None: answer = 'Successfully!'
 
         return answer
