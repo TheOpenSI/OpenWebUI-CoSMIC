@@ -41,6 +41,13 @@ class Pipeline:
         self.config_modify_timestamp = str(os.path.getmtime(self.config_path))
         self.MAX_QUERIES_PER_USER = 5
 
+        # Set OPENAI_API_KEY first before constructing OpenSICoSMIC since this config will
+        # be directly used in OpenSICoSMIC().
+        self.update_openai_key()
+        self.opensi_cosmic = OpenSICoSMIC(config_path=self.config_path)
+        self.openai_api_status = self.check_openai_key()
+
+    def update_openai_key(self):
         # Set up OPENAI_API_KEY globally through root's .env.
         envs = dotenv.dotenv_values(self.env_path)
 
@@ -50,12 +57,7 @@ class Pipeline:
             self.openai_api_key = ""
 
         os.environ["OPENAI_API_KEY"] = self.openai_api_key
-
-        # Set OPENAI_API_KEY first before constructing OpenSICoSMIC since this config will
-        # be directly used in OpenSICoSMIC().
-        self.opensi_cosmic = OpenSICoSMIC(config_path=self.config_path)
         self.valves = self.Valves(**{"OPENAI_API_KEY": os.getenv("OPENAI_API_KEY", "")})
-        self.openai_api_status = self.check_openai_key()
 
     def check_openai_key(self):
         llm_name = self.opensi_cosmic.config.llm_name
@@ -74,8 +76,9 @@ class Pipeline:
         if (count > 0) and (self.openai_api_key == ""):
             if count == 1: answer = f"{llm_name_list[0]} is"
             elif count == 2: answer = f"{llm_name_list[0]} and {llm_name_list[1]} are"
-            answer = f"Since {answer} used, please add valid OPENAI_API_KEY in " \
-                f".env OR via [account]/Settings/Admin Settings/Configs/[OpenAI API Key]."
+            answer = f"Since {answer} used, please add valid OPENAI_API_KEY\n" \
+                f"in [account]/Settings/Admin Settings/Configs/[OpenAI API Key] then save."
+
         else:
             answer = ""
 
@@ -106,6 +109,7 @@ class Pipeline:
             os.environ["OPENAI_API_KEY"] = self.openai_api_key
             self.opensi_cosmic = OpenSICoSMIC(config_path=self.config_path)
             print('Reconstruct OpenSICoSMIC due to changed configs.')
+            self.update_openai_key()
             self.openai_api_status = self.check_openai_key()
 
         # Extract user_id from body. Adjust if user_id is available elsewhere.
