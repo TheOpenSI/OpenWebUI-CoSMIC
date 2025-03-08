@@ -1263,7 +1263,7 @@ def reset_vector_db(user=Depends(get_admin_user)):
 
 @app.post("/reset/uploads")
 def reset_upload_dir(user=Depends(get_admin_user)) -> bool:
-    folder = f"{UPLOAD_DIR}"
+    folder = f"{UPLOAD_DIR}/{user.id}"
     try:
         # Check if the directory exists
         if os.path.exists(folder):
@@ -1287,7 +1287,7 @@ def reset_upload_dir(user=Depends(get_admin_user)) -> bool:
 
 @app.post("/reset")
 def reset(user=Depends(get_admin_user)) -> bool:
-    folder = f"{UPLOAD_DIR}"
+    folder = f"{UPLOAD_DIR}/{user.id}"
     for filename in os.listdir(folder):
         file_path = os.path.join(folder, filename)
         try:

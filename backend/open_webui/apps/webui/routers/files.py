@@ -44,7 +44,11 @@ def upload_file(file: UploadFile = File(...), user=Depends(get_verified_user)):
         id = str(uuid.uuid4())
         name = filename
         filename = f"{id}_{filename}"
-        file_path = f"{UPLOAD_DIR}/{filename}"
+        file_dir = f"{UPLOAD_DIR}/{user.id}"
+        file_path = f"{file_dir}/{filename}"
+
+        if not os.path.exists(file_dir):
+            os.makedirs(file_dir)
 
         contents = file.file.read()
         with open(file_path, "wb") as f:
@@ -114,7 +118,7 @@ async def delete_all_files(user=Depends(get_admin_user)):
     result = Files.delete_all_files()
 
     if result:
-        folder = f"{UPLOAD_DIR}"
+        folder = f"{UPLOAD_DIR}/{user.id}"
         try:
             # Check if the directory exists
             if os.path.exists(folder):

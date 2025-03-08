@@ -186,6 +186,12 @@ class OpenAIConfig(BaseModel):
     api_key: str
 
 
+class UploadedFileInfo(BaseModel):
+    file_name: str
+    file_id: str
+    file_url: str
+
+
 class ConfigUpdateForm(BaseModel):
     llm_name: str
     is_quantized: bool
@@ -201,11 +207,11 @@ class ConfigUpdateForm(BaseModel):
 
 
 def get_config_path():
-    shared_config_dir = "/app/backend/shared"
-    os.makedirs(shared_config_dir, exist_ok=True)
+    config_dir = "/app/backend/config"
+    os.makedirs(config_dir, exist_ok=True)
 
-    config_path = os.path.join(shared_config_dir, "config.yaml")
-    config_path_updated = os.path.join(shared_config_dir, "config_updated.yaml")
+    config_path = os.path.join(config_dir, "config.yaml")
+    config_path_updated = os.path.join(config_dir, "config_updated.yaml")
 
     if not os.path.exists(config_path_updated):
         shutil.copyfile(config_path, config_path_updated)
@@ -283,6 +289,21 @@ async def update_cosmic_config(form_data: ConfigUpdateForm, user=Depends(get_adm
         yaml.safe_dump(config_data, file)
 
     return app.config
+
+
+# 06-03-2025 Danny, not used but this is how it can be used in future.
+@app.post("/config/vector_db_update")
+async def update_cosmic_vector_db(file_info: UploadedFileInfo, user=Depends(get_admin_user)):
+    shared_config_dir = "/app/backend/data/shared"
+    os.makedirs(shared_config_dir, exist_ok=True)
+    config_path = os.path.join(shared_config_dir, "log.txt")
+
+    with open(config_path, "w") as file:
+        file.write(file_info.file_name + '\n')
+        file.write(file_info.file_id + '\n')
+        file.write(file_info.file_url + '\n')
+
+    return 0
 
 
 def update_embedding_model(
@@ -1190,7 +1211,7 @@ def reset_vector_db(user=Depends(get_admin_user)):
 
 @app.post("/reset/uploads")
 def reset_upload_dir(user=Depends(get_admin_user)) -> bool:
-    folder = f"{UPLOAD_DIR}"
+    folder = f"{UPLOAD_DIR}/{user.id}"
     try:
         # Check if the directory exists
         if os.path.exists(folder):
@@ -1214,7 +1235,7 @@ def reset_upload_dir(user=Depends(get_admin_user)) -> bool:
 
 @app.post("/reset")
 def reset(user=Depends(get_admin_user)) -> bool:
-    folder = f"{UPLOAD_DIR}"
+    folder = f"{UPLOAD_DIR}/{user.id}"
     for filename in os.listdir(folder):
         file_path = os.path.join(folder, filename)
         try:

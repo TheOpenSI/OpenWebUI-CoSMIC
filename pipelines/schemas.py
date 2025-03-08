@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict
 class OpenAIChatMessage(BaseModel):
     role: str
     content: str
+    content_cosmic: Optional[str] = None
 
     model_config = ConfigDict(extra="allow")
 

@@ -28,11 +28,19 @@ def stream_message_template(model: str, message: str):
 def get_last_user_message(messages: List[dict]) -> str:
     for message in reversed(messages):
         if message["role"] == "user":
-            if isinstance(message["content"], list):
-                for item in message["content"]:
+            content_obj = message["content"]
+
+            if "content_cosmic" in message.keys() \
+                and message["content_cosmic"] is not None:
+                content_obj = message["content_cosmic"]
+
+            if isinstance(content_obj, list):
+                for item in content_obj:
                     if item["type"] == "text":
                         return item["text"]
-            return message["content"]
+
+            return content_obj
+
     return None
 
 

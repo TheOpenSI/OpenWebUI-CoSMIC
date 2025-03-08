@@ -715,7 +715,8 @@
 				parentId: messages.length !== 0 ? messages.at(-1).id : null,
 				childrenIds: [],
 				role: 'user',
-				content: userPrompt,
+				content: userPrompt.split('</files>').at(-1),
+				content_cosmic: userPrompt,
 				files: _files.length > 0 ? _files : undefined,
 				timestamp: Math.floor(Date.now() / 1000), // Unix epoch
 				models: selectedModels
@@ -1372,8 +1373,19 @@
 												type: 'text',
 												text:
 													arr.length - 1 !== idx
-														? message.content
-														: (message?.raContent ?? message.content)
+													? (
+														message?.content_cosmic && (message.content_cosmic !== null)
+														? message.content_cosmic
+														: message.content
+													)
+													: (
+														message?.raContent
+														?? (
+															message?.content_cosmic && (message.content_cosmic !== null)
+															? message.content_cosmic
+															: message.content
+														)
+													)
 											},
 											...message.files
 												.filter((file) => file.type === 'image')
@@ -1388,8 +1400,19 @@
 								: {
 										content:
 											arr.length - 1 !== idx
-												? message.content
-												: (message?.raContent ?? message.content)
+											? (
+												message?.content_cosmic && (message.content_cosmic !== null)
+												? message.content_cosmic
+												: message.content
+										    )
+											: (
+												message?.raContent
+												?? (
+													message?.content_cosmic && (message.content_cosmic !== null)
+													? message.content_cosmic
+													: message.content
+											    )
+											)
 									})
 						})),
 					seed: params?.seed ?? $settings?.params?.seed ?? undefined,

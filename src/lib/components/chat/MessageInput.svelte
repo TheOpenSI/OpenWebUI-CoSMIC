@@ -18,6 +18,7 @@
 	import { blobToFile, findWordIndices } from '$lib/utils';
 	import { transcribeAudio } from '$lib/apis/audio';
 	import { uploadFile } from '$lib/apis/files';
+	import { updateVectorDBCoSMIC } from '$lib/apis/cosmic';  // not used
 
 	import { WEBUI_BASE_URL, WEBUI_API_BASE_URL } from '$lib/constants';
 
@@ -135,11 +136,28 @@
 			toast.error(e);
 			files = files.filter((item) => item.status !== null);
 		}
+
+		try {
+			// 06-03-2025 Danny, not used but this is how it can be used in future.
+			const res = await updateVectorDBCoSMIC(
+				localStorage.token,
+				file.name,
+				fileItem.id,
+				fileItem.url
+		    );
+
+			if (res) {
+				console.log(res);
+			}
+		} catch (e) {
+			toast.error(e);
+		}
 	};
 
 	const inputFilesHandler = async (inputFiles) => {
 		inputFiles.forEach((file) => {
-			console.log(file, file.name.split('.').at(-1));
+			let postfix = file.name.split('.').at(-1)
+			console.log(file, postfix);
 
 			if (
 				($config?.file?.max_size ?? null) !== null &&
@@ -149,6 +167,11 @@
 					$i18n.t(`File size should not exceed {{maxSize}} MB.`, {
 						maxSize: $config?.file?.max_size
 					})
+				);
+				return;
+			} else if (postfix !== 'pdf') {
+				toast.error(
+					$i18n.t(`File must be .pdf, not ${postfix}.`)
 				);
 				return;
 			}
@@ -513,6 +536,15 @@
 
 											// Submit the prompt when Enter key is pressed
 											if (prompt !== '' && e.key === 'Enter' && !e.shiftKey) {
+												// 06-03-2025 Danny, update the vector database through query.
+												let file_string = '';
+
+												if (files.length > 0) {
+													files.forEach((file) => {
+														file_string = file_string + `,${file.id}_${file.name}`;
+													});
+													prompt = `<files>${file_string}</files>${prompt}`;
+												}
 												dispatch('submit', prompt);
 											}
 										}

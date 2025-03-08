@@ -60,6 +60,30 @@ export const updateCoSMICConfig = async (token: string, payload: CoSMICConfigFor
 	return res;
 };
 
+// 06-03-2025 Danny, this can be used in future.
+export const updateVectorDBCoSMIC = async (token: string, file_name: string, file_id: string, file_url: string) => {
+	let error = null;
+
+	const res = await fetch(`${COSMIC_API_BASE_URL}/config/vector_db_update`, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			authorization: `Bearer ${token}`
+		},
+		body: JSON.stringify({
+			file_name: file_name,
+			file_id: file_id,
+			file_url: file_url
+		})
+	})
+
+	if (error) {
+		throw error;
+	}
+
+	return res;
+};
+
 export const getRAGTemplate = async (token: string) => {
 	let error = null;
 
