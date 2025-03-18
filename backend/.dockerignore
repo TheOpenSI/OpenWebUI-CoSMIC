@@ -12,4 +12,3 @@ _test
 !data/litellm/config.yaml
 
 !data/config.json
-**/venv

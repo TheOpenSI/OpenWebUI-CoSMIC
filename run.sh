@@ -1,8 +1,5 @@
 #!/bin/bash
 
-cd "$(dirname "$0")"
-SCRIPT_DIR="$(pwd)"
-
 image_name="open-webui"
 container_name="open-webui"
 host_port=3000
@@ -17,12 +14,6 @@ docker run -d -p "$host_port":"$container_port" \
     -v "${image_name}:/app/backend/data" \
     --name "$container_name" \
     --restart always \
-    --mount type=bind,source="${SCRIPT_DIR}/data/backend/data/config",target="/app/backend/data/config" \
-    --mount type=bind,source="${SCRIPT_DIR}/.env",target="/app/backend/.env" \
     "$image_name"
 
 docker image prune -f
-
-cd pipelines
-bash start.sh
-cd ..
