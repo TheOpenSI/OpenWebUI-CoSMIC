@@ -986,7 +986,7 @@ def process_file(
             # Usage: /files/
             file_path = file.path
             if file_path:
-                file_path = Storage.get_file(file_path)
+                file_path = Storage.get_file(user.id, file_path)
                 loader = Loader(
                     engine=request.app.state.config.CONTENT_EXTRACTION_ENGINE,
                     TIKA_SERVER_URL=request.app.state.config.TIKA_SERVER_URL,
@@ -1619,7 +1619,7 @@ def reset_vector_db(user=Depends(get_admin_user)):
 
 @router.post("/reset/uploads")
 def reset_upload_dir(user=Depends(get_admin_user)) -> bool:
-    folder = f"{UPLOAD_DIR}"
+    folder = f"{UPLOAD_DIR}/{user.id}"
     try:
         # Check if the directory exists
         if os.path.exists(folder):

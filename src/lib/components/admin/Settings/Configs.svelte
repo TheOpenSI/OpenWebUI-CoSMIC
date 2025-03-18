@@ -62,13 +62,6 @@
 	let showResetConfirm = false;
 	let showResetUploadDirConfirm = false;
 
-	let querySettings = {
-		template: '',
-		r: 0.0,
-		k: 4,
-		hybrid: false
-	};
- 
 
 	// Watch for "Same as Above" checkbox
     $: if (sameAsAbove) {
@@ -85,18 +78,12 @@
 		// Detect if the selected LLM is a GPT model
 		isGPTModel = generalLLM.startsWith("gpt");
 
-
 		// Detect if the selected LLM is explicitly 'ollama'
 		isOllamaSelected = generalLLM === "ollama";
 
-		// Send the selected LLM to the backend
-		try {
-			await updateQuerySettings({ llm: generalLLM });
-			console.log("LLM updated successfully:", generalLLM);
-		} catch (error) {
-			console.error("Error updating LLM selection:", error);
-		}
+		console.log("LLM updated successfully:", generalLLM);
 	}
+
 
 	// Update function for LLM selection
 	async function updateQueryAnalyserLLMSelection() {
@@ -112,7 +99,6 @@
     async function updateOpenAIKey() {
 	    if (!openaiApiKey) {
 	        console.error("API Key cannot be empty.");
-		    return;
 	    }
     }
 
@@ -121,14 +107,8 @@
     async function updateOllamaModelName() {
 		if (!ollamaModelName) {
 			console.error("No Ollama model name provided.");
-			return;
 		}
-		try {
-			await updateQuerySettings({ ollama_model_name: ollamaModelName });
-			console.log("Ollama model name updated successfully:", ollamaModelName);
-		} catch (error) {
-			console.error("Error updating Ollama model name:", error);
-		}
+		console.log("Ollama model name updated successfully:", ollamaModelName);
     }
 
 
@@ -163,44 +143,27 @@
 
 
 	async function updateCoSMICRAGRetrieveScoreThreshold() {
-		try {
-			// Ensure the value is within range
-			if (CoSMICRAGRetrieveScoreThreshold < 0 || CoSMICRAGRetrieveScoreThreshold > 1) {
-				console.error("Value must be between 0 and 1.");
-				return;
-			}
-			// await updateQuerySettings({ retrieve_score_threshold: retrieveScoreThreshold });
-			console.log("RAG relevance threshold updated successfully:", CoSMICRAGRetrieveScoreThreshold);
-		} catch (error) {
-			console.error("Error updating Retrieve Score Threshold:", error);
+		// Ensure the value is within range
+		if (CoSMICRAGRetrieveScoreThreshold < 0 || CoSMICRAGRetrieveScoreThreshold > 1) {
+			console.error("Value must be between 0 and 1.");
 		}
+		console.log("RAG relevance threshold updated successfully:", CoSMICRAGRetrieveScoreThreshold);
 	}
 
 
 	// Handler to update Quantized value
     async function updateQuantized() {
-		try {
-			await updateQuerySettings({ is_quantized: generalQuantized });
-			console.log("Quantized updated successfully:", generalQuantized);
-		} catch (error) {
-			console.error("Error updating Quantized value:", error);
-		}
+		console.log("Quantized updated successfully:", generalQuantized);
     }
 
 
 	// Handler to update Random Seed value
 	async function updategeneralSeed() {
-		try {
-			// Ensure the value is a non-negative integer
-			if (generalSeed < 0 || !Number.isInteger(generalSeed)) {
-				console.error("Random Seed must be a non-negative integer.");
-				return;
-			}
-			await updateQuerySettings({ random_seed: generalSeed });
-			console.log("Random Seed updated successfully:", generalSeed);
-		} catch (error) {
-			console.error("Error updating Random Seed value:", error);
+		// Ensure the value is a non-negative integer
+		if (generalSeed < 0 || !Number.isInteger(generalSeed)) {
+			console.error("Random seed must be a non-negative integer.");
 		}
+		console.log("Random seed updated successfully:", generalSeed);
 	}
 
 
@@ -221,32 +184,40 @@
 			}
 		}
 
-		await updateCoSMICConfig(localStorage.token, {
-			llm_name: general_llm_name,
-			is_quantized: generalQuantized,
-			seed: generalSeed,
-			doc_directory: documentFilePath,  // TODO
-			document_path: documentFilePath,  // TODO
-			service: service,
-			sameasabove: sameAsAbove,
-			query_analyser: {
-				llm_name: query_analyser_llm_name,
-				is_quantized: queryAnalyserQuantized
-			},
-			rag: {
-				top_k: CoSMICRAGTopK,
-				retrieve_score_threshold: CoSMICRAGRetrieveScoreThreshold,
-				vector_db_path: "" // TODO
-			},
-			chess: {
-				stockfish_path: stockfishPath
-			},
-			openai: {
-				api_key: openaiApiKey
-			}
-		});
+		try {
+			const res = await updateCoSMICConfig(localStorage.token, {
+				llm_name: general_llm_name,
+				is_quantized: generalQuantized,
+				seed: generalSeed,
+				doc_directory: documentFilePath,  // TODO
+				document_path: documentFilePath,  // TODO
+				service: service,
+				sameasabove: sameAsAbove,
+				query_analyser: {
+					llm_name: query_analyser_llm_name,
+					is_quantized: queryAnalyserQuantized
+				},
+				rag: {
+					top_k: CoSMICRAGTopK,
+					retrieve_score_threshold: CoSMICRAGRetrieveScoreThreshold,
+					vector_db_path: "" // TODO
+				},
+				chess: {
+					stockfish_path: stockfishPath
+				},
+				openai: {
+					api_key: openaiApiKey
+				}
+			});
 
-		await updateQuerySettings(localStorage.token, querySettings);
+			if (res.ok) {
+				console.log('Configs saved successfully');
+			} else {
+				console.log("Error, updateCoSMICConfig failed.");
+			}
+		} catch (error) {
+			console.error("Error updating CoSMIC configs:", error);
+		}
 
 		dispatch('save');
 	};
@@ -761,9 +732,9 @@
 		</div>
 	</div>
 
-	<div class="flex justify-end pt-3 text-sm font-medium">
+	<div class="flex justify-end text-sm font-medium">
 		<button
-			class=" px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-gray-100 transition rounded-lg"
+			class="px-3.5 py-1.5 text-sm font-medium bg-black hover:bg-gray-900 text-white dark:bg-white dark:text-black dark:hover:bg-gray-100 transition rounded-full"
 			type="submit"
 		>
 			{$i18n.t('Save')}

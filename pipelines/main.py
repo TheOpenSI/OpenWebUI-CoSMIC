@@ -158,12 +158,13 @@ async def load_module_from_path(module_name, module_path):
         print(f"Error loading module: {module_name}")
 
         # Move the file to the error folder
-        failed_pipelines_folder = os.path.join(PIPELINES_DIR, "failed")
-        if not os.path.exists(failed_pipelines_folder):
-            os.makedirs(failed_pipelines_folder)
+        if False:  # Danny disable moving filed pipelines.
+            failed_pipelines_folder = os.path.join(PIPELINES_DIR, "failed")
+            if not os.path.exists(failed_pipelines_folder):
+                os.makedirs(failed_pipelines_folder)
 
-        failed_file_path = os.path.join(failed_pipelines_folder, f"{module_name}.py")
-        os.rename(module_path, failed_file_path)
+            failed_file_path = os.path.join(failed_pipelines_folder, f"{module_name}.py")
+            os.rename(module_path, failed_file_path)
         print(e)
     return None
 

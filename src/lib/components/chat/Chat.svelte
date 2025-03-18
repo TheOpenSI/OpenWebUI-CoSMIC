@@ -1302,7 +1302,8 @@
 			parentId: messages.length !== 0 ? messages.at(-1).id : null,
 			childrenIds: [],
 			role: 'user',
-			content: userPrompt,
+			content: userPrompt.split('</files>').at(-1),
+			content_cosmic: userPrompt,
 			files: _files.length > 0 ? _files : undefined,
 			timestamp: Math.floor(Date.now() / 1000), // Unix epoch
 			models: selectedModels
@@ -1523,7 +1524,12 @@
 							content: [
 								{
 									type: 'text',
-									text: message?.merged?.content ?? message.content
+									text: message?.merged?.content
+									?? (
+										message?.content_cosmic && (message.content_cosmic !== null)
+										? message.content_cosmic
+										: message.content
+									)
 								},
 								...message.files
 									.filter((file) => file.type === 'image')
@@ -1536,7 +1542,12 @@
 							]
 						}
 					: {
-							content: message?.merged?.content ?? message.content
+							content: message?.merged?.content
+							?? (
+								message?.content_cosmic && (message.content_cosmic !== null)
+								? message.content_cosmic
+								: message.content
+							)
 						})
 			}))
 			.filter((message) => message?.role === 'user' || message?.content?.trim());

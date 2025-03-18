@@ -24,6 +24,7 @@
 	import { blobToFile, compressImage, createMessagesList, findWordIndices } from '$lib/utils';
 	import { transcribeAudio } from '$lib/apis/audio';
 	import { uploadFile } from '$lib/apis/files';
+	import { updateVectorDBCoSMIC } from '$lib/apis/cosmic';  // not used
 	import { generateAutoCompletion } from '$lib/apis';
 	import { deleteFileById } from '$lib/apis/files';
 
@@ -208,11 +209,28 @@
 			toast.error(`${e}`);
 			files = files.filter((item) => item?.itemId !== tempItemId);
 		}
+
+		try {
+			// 06-03-2025 Danny, not used but this is how it can be used in future.
+			const res = await updateVectorDBCoSMIC(
+				localStorage.token,
+				file.name,
+				fileItem.id,
+				fileItem.url
+		    );
+
+			if (res) {
+				console.log(res);
+			}
+		} catch (e) {
+			toast.error(e);
+		}
 	};
 
 	const inputFilesHandler = async (inputFiles) => {
 		console.log('Input files handler called with:', inputFiles);
 		inputFiles.forEach((file) => {
+			let postfix = file.name.split('.').at(-1)
 			console.log('Processing file:', {
 				name: file.name,
 				type: file.type,
@@ -232,6 +250,11 @@
 					$i18n.t(`File size should not exceed {{maxSize}} MB.`, {
 						maxSize: $config?.file?.max_size
 					})
+				);
+				return;
+			} else if (postfix !== 'pdf') {
+				toast.error(
+					$i18n.t(`File must be .pdf, not ${postfix}.`)
 				);
 				return;
 			}
@@ -826,8 +849,19 @@
 															if (enterPressed) {
 																e.preventDefault();
 																if (prompt !== '' || files.length > 0) {
-																	dispatch('submit', prompt);
-																}
+																	// 06-03-2025 Danny, update the vector database through query.
+																	let file_string = '';
+																	console.log(files.length);
+
+																	if (files.length > 0) {
+																		files.forEach((file) => {
+																			file_string = file_string + `,${file.id}_${file.name}`;
+																		});
+																		console.log(file_string);
+																		prompt = `<files>${file_string}</files>${prompt}`;
+																	}
+																			dispatch('submit', prompt);
+																		}
 															}
 														}
 													}

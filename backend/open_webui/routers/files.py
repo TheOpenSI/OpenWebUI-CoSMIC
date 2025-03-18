@@ -48,7 +48,7 @@ def upload_file(
         id = str(uuid.uuid4())
         name = filename
         filename = f"{id}_{filename}"
-        contents, file_path = Storage.upload_file(file.file, filename)
+        contents, file_path = Storage.upload_file(file.file, user.id, filename)
 
         file_item = Files.insert_new_file(
             user.id,
@@ -74,7 +74,7 @@ def upload_file(
                 "audio/ogg",
                 "audio/x-m4a",
             ]:
-                file_path = Storage.get_file(file_path)
+                file_path = Storage.get_file(user.id, file_path)
                 result = transcribe(request, file_path)
                 process_file(
                     request,
@@ -135,7 +135,7 @@ async def delete_all_files(user=Depends(get_admin_user)):
     result = Files.delete_all_files()
     if result:
         try:
-            Storage.delete_all_files()
+            Storage.delete_all_files(user.id)
         except Exception as e:
             log.exception(e)
             log.error("Error deleting files")
@@ -232,7 +232,7 @@ async def get_file_content_by_id(id: str, user=Depends(get_verified_user)):
     file = Files.get_file_by_id(id)
     if file and (file.user_id == user.id or user.role == "admin"):
         try:
-            file_path = Storage.get_file(file.path)
+            file_path = Storage.get_file(user.id, file.path)
             file_path = Path(file_path)
 
             # Check if the file already exists in the cache
@@ -284,7 +284,7 @@ async def get_html_file_content_by_id(id: str, user=Depends(get_verified_user)):
     file = Files.get_file_by_id(id)
     if file and (file.user_id == user.id or user.role == "admin"):
         try:
-            file_path = Storage.get_file(file.path)
+            file_path = Storage.get_file(user.id, file.path)
             file_path = Path(file_path)
 
             # Check if the file already exists in the cache
@@ -325,7 +325,7 @@ async def get_file_content_by_id(id: str, user=Depends(get_verified_user)):
         }
 
         if file_path:
-            file_path = Storage.get_file(file_path)
+            file_path = Storage.get_file(user.id, file_path)
             file_path = Path(file_path)
 
             # Check if the file already exists in the cache

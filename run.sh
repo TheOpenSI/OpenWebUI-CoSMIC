@@ -14,6 +14,8 @@ docker run -d -p "$host_port":"$container_port" \
     -v "${image_name}:/app/backend/data" \
     --name "$container_name" \
     --restart always \
+    --mount type=bind,source="${SCRIPT_DIR}/scripts/configs",target="/app/backend/configs" \
+    --mount type=bind,source="${SCRIPT_DIR}/.env",target="/app/backend/.env" \
     "$image_name"
 
 docker image prune -f

@@ -40,54 +40,58 @@ log.setLevel(SRC_LOG_LEVELS["MAIN"])
 
 class StorageProvider(ABC):
     @abstractmethod
-    def get_file(self, file_path: str) -> str:
+    def get_file(self, user_id: str, file_path: str) -> str:
         pass
 
     @abstractmethod
-    def upload_file(self, file: BinaryIO, filename: str) -> Tuple[bytes, str]:
+    def upload_file(self, file: BinaryIO, user_id: str, filename: str) -> Tuple[bytes, str]:
         pass
 
     @abstractmethod
-    def delete_all_files(self) -> None:
+    def delete_all_files(self, user_id: str) -> None:
         pass
 
     @abstractmethod
-    def delete_file(self, file_path: str) -> None:
+    def delete_file(self, user_id: str, file_path: str) -> None:
         pass
 
 
 class LocalStorageProvider(StorageProvider):
     @staticmethod
-    def upload_file(file: BinaryIO, filename: str) -> Tuple[bytes, str]:
+    def upload_file(file: BinaryIO, user_id: str, filename: str) -> Tuple[bytes, str]:
         contents = file.read()
         if not contents:
             raise ValueError(ERROR_MESSAGES.EMPTY_CONTENT)
-        file_path = f"{UPLOAD_DIR}/{filename}"
+        file_dir = f"{UPLOAD_DIR}/{user_id}"
+        os.makedirs(file_dir, exist_ok=True)
+        file_path = f"{file_dir}/{filename}"
         with open(file_path, "wb") as f:
             f.write(contents)
         return contents, file_path
 
     @staticmethod
-    def get_file(file_path: str) -> str:
+    def get_file(user_id: str, file_path: str) -> str:
         """Handles downloading of the file from local storage."""
         return file_path
 
     @staticmethod
-    def delete_file(file_path: str) -> None:
+    def delete_file(user_id: str, file_path: str) -> None:
         """Handles deletion of the file from local storage."""
         filename = file_path.split("/")[-1]
-        file_path = f"{UPLOAD_DIR}/{filename}"
+        file_dir = f"{UPLOAD_DIR}/{user_id}"
+        file_path = f"{file_dir}/{filename}"
         if os.path.isfile(file_path):
             os.remove(file_path)
         else:
             log.warning(f"File {file_path} not found in local storage.")
 
     @staticmethod
-    def delete_all_files() -> None:
+    def delete_all_files(user_id: str) -> None:
         """Handles deletion of all files from local storage."""
-        if os.path.exists(UPLOAD_DIR):
-            for filename in os.listdir(UPLOAD_DIR):
-                file_path = os.path.join(UPLOAD_DIR, filename)
+        file_dir = f"{UPLOAD_DIR}/{user_id}"
+        if os.path.exists(file_dir):
+            for filename in os.listdir(file_dir):
+                file_path = os.path.join(file_dir, filename)
                 try:
                     if os.path.isfile(file_path) or os.path.islink(file_path):
                         os.unlink(file_path)  # Remove the file or link
@@ -96,7 +100,7 @@ class LocalStorageProvider(StorageProvider):
                 except Exception as e:
                     log.exception(f"Failed to delete {file_path}. Reason: {e}")
         else:
-            log.warning(f"Directory {UPLOAD_DIR} not found in local storage.")
+            log.warning(f"Directory {file_dir} not found in local storage.")
 
 
 class S3StorageProvider(StorageProvider):
@@ -131,9 +135,9 @@ class S3StorageProvider(StorageProvider):
         self.bucket_name = S3_BUCKET_NAME
         self.key_prefix = S3_KEY_PREFIX if S3_KEY_PREFIX else ""
 
-    def upload_file(self, file: BinaryIO, filename: str) -> Tuple[bytes, str]:
+    def upload_file(self, file: BinaryIO, user_id: str, filename: str) -> Tuple[bytes, str]:
         """Handles uploading of the file to S3 storage."""
-        _, file_path = LocalStorageProvider.upload_file(file, filename)
+        _, file_path = LocalStorageProvider.upload_file(file, user_id, filename)
         try:
             s3_key = os.path.join(self.key_prefix, filename)
             self.s3_client.upload_file(file_path, self.bucket_name, s3_key)
@@ -144,7 +148,7 @@ class S3StorageProvider(StorageProvider):
         except ClientError as e:
             raise RuntimeError(f"Error uploading file to S3: {e}")
 
-    def get_file(self, file_path: str) -> str:
+    def get_file(self, user_id: str, file_path: str) -> str:
         """Handles downloading of the file from S3 storage."""
         try:
             s3_key = self._extract_s3_key(file_path)
@@ -154,7 +158,7 @@ class S3StorageProvider(StorageProvider):
         except ClientError as e:
             raise RuntimeError(f"Error downloading file from S3: {e}")
 
-    def delete_file(self, file_path: str) -> None:
+    def delete_file(self, user_id: str, file_path: str) -> None:
         """Handles deletion of the file from S3 storage."""
         try:
             s3_key = self._extract_s3_key(file_path)
@@ -163,7 +167,7 @@ class S3StorageProvider(StorageProvider):
             raise RuntimeError(f"Error deleting file from S3: {e}")
 
         # Always delete from local storage
-        LocalStorageProvider.delete_file(file_path)
+        LocalStorageProvider.delete_file(user_id, file_path)
 
     def delete_all_files(self) -> None:
         """Handles deletion of all files from S3 storage."""
@@ -188,8 +192,8 @@ class S3StorageProvider(StorageProvider):
     def _extract_s3_key(self, full_file_path: str) -> str:
         return "/".join(full_file_path.split("//")[1].split("/")[1:])
 
-    def _get_local_file_path(self, s3_key: str) -> str:
-        return f"{UPLOAD_DIR}/{s3_key.split('/')[-1]}"
+    def _get_local_file_path(self, user_id: str, s3_key: str) -> str:
+        return f"{UPLOAD_DIR}/{user_id}/{s3_key.split('/')[-1]}"
 
 
 class GCSStorageProvider(StorageProvider):
@@ -217,11 +221,12 @@ class GCSStorageProvider(StorageProvider):
         except GoogleCloudError as e:
             raise RuntimeError(f"Error uploading file to GCS: {e}")
 
-    def get_file(self, file_path: str) -> str:
+    def get_file(self, user_id: str, file_path: str) -> str:
         """Handles downloading of the file from GCS storage."""
         try:
             filename = file_path.removeprefix("gs://").split("/")[1]
-            local_file_path = f"{UPLOAD_DIR}/{filename}"
+            file_dir = f"{UPLOAD_DIR}/{user_id}"
+            local_file_path = f"{file_dir}/{filename}"
             blob = self.bucket.get_blob(filename)
             blob.download_to_filename(local_file_path)
 
@@ -229,7 +234,7 @@ class GCSStorageProvider(StorageProvider):
         except NotFound as e:
             raise RuntimeError(f"Error downloading file from GCS: {e}")
 
-    def delete_file(self, file_path: str) -> None:
+    def delete_file(self, user_id: str, file_path: str) -> None:
         """Handles deletion of the file from GCS storage."""
         try:
             filename = file_path.removeprefix("gs://").split("/")[1]
@@ -239,9 +244,9 @@ class GCSStorageProvider(StorageProvider):
             raise RuntimeError(f"Error deleting file from GCS: {e}")
 
         # Always delete from local storage
-        LocalStorageProvider.delete_file(file_path)
+        LocalStorageProvider.delete_file(user_id, file_path)
 
-    def delete_all_files(self) -> None:
+    def delete_all_files(self, user_id: str) -> None:
         """Handles deletion of all files from GCS storage."""
         try:
             blobs = self.bucket.list_blobs()
@@ -253,7 +258,7 @@ class GCSStorageProvider(StorageProvider):
             raise RuntimeError(f"Error deleting all files from GCS: {e}")
 
         # Always delete from local storage
-        LocalStorageProvider.delete_all_files()
+        LocalStorageProvider.delete_all_files(user_id)
 
 
 class AzureStorageProvider(StorageProvider):
@@ -287,11 +292,12 @@ class AzureStorageProvider(StorageProvider):
         except Exception as e:
             raise RuntimeError(f"Error uploading file to Azure Blob Storage: {e}")
 
-    def get_file(self, file_path: str) -> str:
+    def get_file(self, user_id: str, file_path: str) -> str:
         """Handles downloading of the file from Azure Blob Storage."""
         try:
             filename = file_path.split("/")[-1]
-            local_file_path = f"{UPLOAD_DIR}/{filename}"
+            file_dir = f"{UPLOAD_DIR}/{user_id}"
+            local_file_path = f"{file_dir}/{filename}"
             blob_client = self.container_client.get_blob_client(filename)
             with open(local_file_path, "wb") as download_file:
                 download_file.write(blob_client.download_blob().readall())
@@ -299,7 +305,7 @@ class AzureStorageProvider(StorageProvider):
         except ResourceNotFoundError as e:
             raise RuntimeError(f"Error downloading file from Azure Blob Storage: {e}")
 
-    def delete_file(self, file_path: str) -> None:
+    def delete_file(self, user_id: str, file_path: str) -> None:
         """Handles deletion of the file from Azure Blob Storage."""
         try:
             filename = file_path.split("/")[-1]
@@ -309,9 +315,9 @@ class AzureStorageProvider(StorageProvider):
             raise RuntimeError(f"Error deleting file from Azure Blob Storage: {e}")
 
         # Always delete from local storage
-        LocalStorageProvider.delete_file(file_path)
+        LocalStorageProvider.delete_file(user_id, file_path)
 
-    def delete_all_files(self) -> None:
+    def delete_all_files(self, user_id: str) -> None:
         """Handles deletion of all files from Azure Blob Storage."""
         try:
             blobs = self.container_client.list_blobs()
@@ -321,7 +327,7 @@ class AzureStorageProvider(StorageProvider):
             raise RuntimeError(f"Error deleting all files from Azure Blob Storage: {e}")
 
         # Always delete from local storage
-        LocalStorageProvider.delete_all_files()
+        LocalStorageProvider.delete_all_files(user_id)
 
 
 def get_storage_provider(storage_provider: str):

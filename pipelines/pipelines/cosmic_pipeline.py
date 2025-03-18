@@ -97,6 +97,9 @@ class Pipeline:
         messages: List[dict],
         body: dict
     ):
+        # Some will run twice for history, just ignore.
+        if user_message[:3] == "###": return ""
+
         current_config_modify_timestamp = str(os.path.getmtime(self.config_path))
         current_openai_api_key = os.environ["OPENAI_API_KEY"]
 

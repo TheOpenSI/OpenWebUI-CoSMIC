@@ -184,7 +184,9 @@
 			});
 
 			if ($user.role === 'admin' && ($settings?.showChangelog ?? true)) {
-				showChangelog.set($settings?.version !== $config.version);
+				// showChangelog.set($settings?.version !== $config.version);
+				// 18-03-2025 Danny disable showing changelog, settings.version undefined.
+				showChangelog.set(false);
 			}
 
 			if ($page.url.searchParams.get('temporary-chat') === 'true') {
