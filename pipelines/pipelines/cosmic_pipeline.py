@@ -1,4 +1,5 @@
 import sys, os, dotenv, shutil, yaml
+import pandas as pd
 
 # Add CoSMIC to the system path
 ROOT = os.path.abspath(f"{os.path.dirname(os.path.abspath(__file__))}/../../../..")
@@ -7,6 +8,8 @@ sys.path.append(ROOT)
 from src.opensi_cosmic import OpenSICoSMIC
 from pydantic import BaseModel
 from typing import List
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 
 class Pipeline:
@@ -22,6 +25,15 @@ class Pipeline:
         self.root = ROOT
         self.config_path = os.path.join(self.root, "scripts/configs/config_updated.yaml")
         self.env_path = os.path.abspath(os.path.join(self.root, ".env"))
+        self.statistic_dir = os.path.join(self.root, "data/cosmic/statistic")
+        self.statistic_dict = {
+            "user_id": "unknown",
+            "email": "unknown",
+            "start_date": -1,
+            "last_date": -1,
+            "average_token_length": 0,
+            "query_count": 0
+        }
 
         if not os.path.exists(self.config_path):
             config_path = os.path.join(self.root, "scripts/configs/config.yaml")
@@ -36,7 +48,7 @@ class Pipeline:
 
         if not os.path.exists(config["rag"]["vector_db_path"]):
             config["rag"]["vector_db_path"] = \
-                f"{self.root}/data/backend/data/vector_db_cosmic"
+                f"{self.root}/data/cosmic/vector_db_cosmic"
 
         with open(self.config_path, "w") as file:
             yaml.safe_dump(config, file)
@@ -90,6 +102,103 @@ class Pipeline:
         print(f"on_shutdown:{__name__}")
         self.opensi_cosmic.quit()
 
+    def update_statistic_table(
+        self,
+        statistic_dict
+    ):
+        os.makedirs(self.statistic_dir, exist_ok=True)
+        current_time = statistic_dict["last_date"]
+        time_split = current_time.split(",")[0].split("-")
+        current_month_year = f"{time_split[1]}-{time_split[2]}"
+        statistic_path = os.path.join(
+            self.statistic_dir,
+            f"{current_month_year}.csv"
+        )
+
+        if os.path.exists(statistic_path):
+            data = pd.read_csv(statistic_path)
+            user_emails = data["email"].tolist()
+        else:
+            user_emails = []
+
+        if statistic_dict["email"] in user_emails:
+            idx = [idx for idx, user_email in enumerate(user_emails) if user_email == statistic_dict["email"]][0]
+            data.loc[idx, "last_date"] = statistic_dict["last_date"]
+            history_total_token_length = data["average_token_length"][idx] * data["query_count"][idx]
+            current_total_token_length = statistic_dict["average_token_length"] * statistic_dict["query_count"]
+            total_query_count = data["query_count"][idx] + statistic_dict["query_count"]
+            data.loc[idx, "average_token_length"] = (history_total_token_length + current_total_token_length) / total_query_count
+            data.loc[idx, "query_count"] = total_query_count
+        else:
+            df = pd.DataFrame([{
+                "user_id": statistic_dict["user_id"],
+                "email": statistic_dict["email"],
+                "start_date": statistic_dict["start_date"],
+                "last_date": statistic_dict["last_date"],
+                "average_token_length": statistic_dict["average_token_length"],
+                "query_count": statistic_dict["query_count"]
+            }])
+            if len(user_emails) > 0: df = pd.concat([data, df], axis=0)
+            data = df
+
+        data.to_csv(
+            statistic_path,
+            header=[
+                "user_id",
+                "email",
+                "start_date",
+                "last_date",
+                "average_token_length",
+                "query_count"
+            ],
+            index=False
+        )
+
+    def update_statistic_per_query(
+        self,
+        query,
+        user_id,
+        user_email,
+        current_time
+    ):
+        if False:
+            # Save for the previous user (when the user_id changed).
+            pre_user_id = self.statistic_dict["user_id"]
+            pre_query_count = self.statistic_dict["query_count"]
+            token_length = len(query)
+
+            # Accumulate for the same user.
+            if pre_user_id == user_id:
+                pre_average_token_length = self.statistic_dict["average_token_length"]
+                self.statistic_dict["last_date"] = current_time
+                self.statistic_dict["average_token_length"] = \
+                    (pre_average_token_length * pre_query_count + token_length) \
+                    / (pre_query_count + 1)
+                self.statistic_dict["query_count"] = pre_query_count + 1
+
+            if pre_user_id != user_id:
+                # Save previous user statistic.
+                if pre_user_id != "unknown":
+                    self.update_statistic_table(self.statistic_dict)
+
+                # Initialize for a different user.
+                self.statistic_dict["user_id"] = user_id
+                self.statistic_dict["email"] = user_email
+                self.statistic_dict["start_date"] = current_time
+                self.statistic_dict["last_date"] = current_time
+                self.statistic_dict["average_token_length"] = token_length
+                self.statistic_dict["query_count"] = 1
+        else:
+            # Save every query for the current user.
+            token_length = len(query)
+            self.statistic_dict["user_id"] = user_id
+            self.statistic_dict["email"] = user_email
+            self.statistic_dict["start_date"] = current_time
+            self.statistic_dict["last_date"] = current_time
+            self.statistic_dict["average_token_length"] = token_length
+            self.statistic_dict["query_count"] = 1
+            self.update_statistic_table(self.statistic_dict)
+
     def pipe(
         self,
         user_message: str,
@@ -117,13 +226,26 @@ class Pipeline:
         # Extract user_id from body. Adjust if user_id is available elsewhere.
         user_id = body["user"]["id"]
         user_role = body["user"]["role"]
+        user_email = body["user"]["email"]
 
         # Set user ID to use a specific vector database.
         # For the same user, the QA instance will not change.
         self.opensi_cosmic.set_up_qa(str(user_id))
 
-        # Check how many queries this user has already made
+        # Check how many queries this user has already made.
         current_count = self.user_queries_count.get(user_id, 0)
+
+        # Compute statistic information.
+        current_time = datetime.strftime(
+            datetime.now(tz=ZoneInfo("Australia/Sydney")),
+            '%d-%m-%Y,%H:%M:%S'
+        )
+        self.update_statistic_per_query(
+            user_message,
+            user_id,
+            user_email,
+            current_time
+        )
 
         if (user_role != "admin") and (current_count >= self.MAX_QUERIES_PER_USER):
             # Return a message indicating the limit has been reached
@@ -144,7 +266,7 @@ class Pipeline:
                 user_message = splits[1]
 
                 # The directory storing uploaded files.
-                file_dir = f"{self.root}/data/backend/data/uploads/{user_id}"
+                file_dir = f"{self.root}/data/cosmic/backend/uploads/{user_id}"
 
                 # Extract the files.
                 files = splits[0].split("<files>")[-1]
