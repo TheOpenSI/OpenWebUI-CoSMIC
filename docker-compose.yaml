@@ -1,25 +1,25 @@
 services:
-#  ollama:
-#    volumes:
-#      - ollama:/root/.ollama
-#    container_name: ollama
-#    pull_policy: always
-#    tty: true
-#    restart: unless-stopped
-#    image: ollama/ollama:${OLLAMA_DOCKER_TAG-latest}
+  ollama:
+    volumes:
+      - ollama:/root/.ollama
+    container_name: ollama
+    pull_policy: always
+    tty: true
+    restart: unless-stopped
+    image: ollama/ollama:${OLLAMA_DOCKER_TAG-latest}
 
   open-webui:
     build:
       context: .
-#      args:
-#        OLLAMA_BASE_URL: '/ollama'
+      args:
+        OLLAMA_BASE_URL: '/ollama'
       dockerfile: Dockerfile
 #    image: ghcr.io/open-webui/open-webui:${WEBUI_DOCKER_TAG-main}
     container_name: open-webui
     volumes:
       - open-webui:/app/backend/data
     depends_on:
-#      - ollama
+      - ollama
       - pipelines
     ports:
       - ${OPEN_WEBUI_PORT-3000}:8080
@@ -39,9 +39,6 @@ services:
       context: ./../pipelines-openwebui
       dockerfile: Dockerfile
     container_name: pipelines
-    environment:
-      - PIPELINES_DIR=./pipelines
-#      - PIPELINES_URLS="https://github.com/open-webui/pipelines/blob/main/examples/filters/detoxify_filter_pipeline.py"
     volumes:
       - ./../pipelines-openwebui:/app/pipelines
     #    pull_policy: always
