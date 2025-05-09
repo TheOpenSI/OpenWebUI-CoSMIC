@@ -11,7 +11,8 @@
 
 	import {
 		getCoSMICConfig,
-		updateCoSMICConfig
+		updateCoSMICConfig,
+		uploadChessFile
 	} from '$lib/apis/cosmic';
 
 	import { deleteAllFiles } from '$lib/apis/files';
@@ -53,6 +54,8 @@
     let openaiApiKey = ""; // OpenAI API Key
 	let documentFilePath = ""; // Default value for the document path
 	let stockfishPath = ""; // Default value for the Stockfish path
+	const formData = new FormData();
+	let isFileSelected = false; // Flag to check if a file is selected
 
 	// Default value for Retrieve Score Threshold
     let CoSMICRAGTopK = 1;
@@ -125,6 +128,7 @@
 	// Function to handle folder selection
 	function handleFolderSelection(event) {
 		const folders = event.target.files;
+		console.log("Selected folders:", event);
 		if (folders && folders.length > 0) {
 			documentFilePath = folders[0].webkitRelativePath.split("/")[0]; // Get folder path
 			console.log("Selected folder path:", documentFilePath);
@@ -134,10 +138,14 @@
 
 	// Function to handle Stockfish file selection
 	function handleStockfishSelection(event) {
-		const files = event.target.files;
-		if (files && files.length > 0) {
-			stockfishPath = files[0].path || files[0].name; // Use the file path or name
+		const file = event.target.files[0];
+		console.log("Selected Stockfish file:", file, file.type);
+		
+		if (file) {
+			stockfishPath = file.name; // Use the file path or name
 			console.log("Selected Stockfish path:", stockfishPath);
+			formData.append("file", file); // Append to FormData
+			isFileSelected = true; // Set the flag to true
 		}
 	}
 
@@ -210,7 +218,18 @@
 				}
 			});
 
-			if (res.ok) {
+			if (isFileSelected) {
+				const fileRes = await uploadChessFile(localStorage.token, formData);
+				if (fileRes.status === "success") {
+					console.log("File uploaded successfully");
+					isFileSelected = false; // Reset the flag after successful upload
+					formData.delete("file"); // Clear the FormData
+				} else {
+					console.error("Error uploading file:", fileRes);
+				}
+			}
+
+			if (res.status === "success") {
 				console.log('Configs saved successfully');
 			} else {
 				console.log("Error, updateCoSMICConfig failed.");
@@ -551,61 +570,6 @@
 							</span>
 						</div>
 					</div>
-				</div>
-			</section>
-
-			<!-- Vector Database Section -->
-			<section class="mt-6 mb-4">
-				<h2 class="mb-2 text-lg font-medium text-gray-900 dark:text-gray-300">Vector Database</h2>
-
-				<!-- Document File Path Subsection -->
-				<div class="mb-4">
-					<label
-						for="document-file-path"
-						class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
-					>
-						Select a document or folder to use for the vector database
-					</label>
-					<div class="flex items-center space-x-2">
-						<!-- Text input to display the selected path -->
-						<input
-							id="document-file-path"
-							type="text"
-							bind:value={documentFilePath}
-							class="flex-1 block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
-							readonly
-							placeholder="No path selected"
-						/>
-						<!-- Button to select a file -->
-						<button
-							class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:bg-blue-500 dark:hover:bg-blue-600 focus:outline-none dark:focus:ring-blue-800"
-							on:click={() => document.getElementById('file-input').click()}
-						>
-							Browse File
-						</button>
-						<!-- Button to select a folder -->
-						<button
-							class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 focus:ring-4 focus:ring-green-300 dark:bg-green-500 dark:hover:bg-green-600 focus:outline-none dark:focus:ring-green-800"
-							on:click={() => document.getElementById('folder-input').click()}
-						>
-							Browse Folder
-						</button>
-					</div>
-					<!-- Hidden file input -->
-					<input
-						id="file-input"
-						type="file"
-						class="hidden"
-						on:change={handleFileSelection}
-					/>
-					<!-- Hidden folder input -->
-					<input
-						id="folder-input"
-						type="file"
-						webkitdirectory
-						class="hidden"
-						on:change={handleFolderSelection}
-					/>
 				</div>
 			</section>
 

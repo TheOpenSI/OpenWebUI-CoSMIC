@@ -1,9 +1,9 @@
-import { COSMIC_API_BASE_URL } from '$lib/constants';
+import { COSMIC_API_BASE_URL, COSMIC_CONFIG_API_BASE_URL } from '$lib/constants';
 
 export const getCoSMICConfig = async (token: string) => {
 	let error = null;
 
-	const res = await fetch(`${COSMIC_API_BASE_URL}/config`, {
+	const res = await fetch(`${COSMIC_CONFIG_API_BASE_URL}/config`, {
 		method: 'GET',
 		headers: {
 			'Content-Type': 'application/json',
@@ -33,7 +33,7 @@ type CoSMICConfigForm = {
 export const updateCoSMICConfig = async (token: string, payload: CoSMICConfigForm) => {
 	let error = null;
 
-	const res = await fetch(`${COSMIC_API_BASE_URL}/config/update`, {
+	const res = await fetch(`${COSMIC_CONFIG_API_BASE_URL}/config/update`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
@@ -42,6 +42,36 @@ export const updateCoSMICConfig = async (token: string, payload: CoSMICConfigFor
 		body: JSON.stringify({
 			...payload
 		})
+	})
+		.then(async (res) => {
+			if (!res.ok) throw await res.json();
+			return res.json();
+		})
+		.catch((err) => {
+			console.log(err);
+			error = err.detail;
+			return null;
+		});
+
+	if (error) {
+		throw error;
+	}
+
+	return res;
+};
+
+export const uploadChessFile = async (token: string, formData: FormData) => {
+	let error = null;
+
+	console.log('uploadChessFile', formData.get('file'));
+	
+
+	const res = await fetch(`${COSMIC_CONFIG_API_BASE_URL}/chess/upload`, {
+		method: 'POST',
+		headers: {
+			Authorization: `Bearer ${token}`
+		},
+		body: formData
 	})
 		.then(async (res) => {
 			if (!res.ok) throw await res.json();
