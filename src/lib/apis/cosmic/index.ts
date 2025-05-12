@@ -63,9 +63,6 @@ export const updateCoSMICConfig = async (token: string, payload: CoSMICConfigFor
 export const uploadChessFile = async (token: string, formData: FormData) => {
 	let error = null;
 
-	console.log('uploadChessFile', formData.get('file'));
-	
-
 	const res = await fetch(`${COSMIC_CONFIG_API_BASE_URL}/chess/upload`, {
 		method: 'POST',
 		headers: {
