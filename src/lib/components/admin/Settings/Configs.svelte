@@ -138,6 +138,7 @@
 
 	// Function to handle Stockfish file selection
 	function handleStockfishSelection(event) {
+		event.preventDefault(); // Prevent default behavior
 		const file = event.target.files[0];
 		console.log("Selected Stockfish file:", file, file.type);
 		
@@ -231,14 +232,14 @@
 
 			if (res.status === "success") {
 				console.log('Configs saved successfully');
+				dispatch('save');
 			} else {
 				console.log("Error, updateCoSMICConfig failed.");
 			}
 		} catch (error) {
 			console.error("Error updating CoSMIC configs:", error);
+			toast.error(`Error updating CoSMIC configs: ${error}`);
 		}
-
-		dispatch('save');
 	};
 
 
@@ -597,6 +598,7 @@
 						/>
 						<!-- Button to select the Stockfish executable -->
 						<button
+							type="button"
 							class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:bg-blue-500 dark:hover:bg-blue-600 focus:outline-none dark:focus:ring-blue-800"
 							on:click={() => document.getElementById('stockfish-input').click()}
 						>

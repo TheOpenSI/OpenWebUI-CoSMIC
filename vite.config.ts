@@ -32,7 +32,8 @@ export default defineConfig({
 	],
 	define: {
 		APP_VERSION: JSON.stringify(process.env.npm_package_version),
-		APP_BUILD_HASH: JSON.stringify(process.env.APP_BUILD_HASH || 'dev-build')
+		APP_BUILD_HASH: JSON.stringify(process.env.APP_BUILD_HASH || 'dev-build'),
+		OPENSI_COSMIC_API_BASE_URL: JSON.stringify(process.env.OPENSI_COSMIC_API_BASE_URL || 'http://localhost:3000'),
 	},
 	build: {
 		sourcemap: true
