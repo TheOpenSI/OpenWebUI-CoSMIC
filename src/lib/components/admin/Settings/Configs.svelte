@@ -328,7 +328,7 @@
 >
 	<div class=" space-y-2.5 overflow-y-scroll scrollbar-hidden h-full pr-1.5">
 		<div class="flex flex-col gap-0.5">
-			<div class=" mb-2 text-2xl font-bold text-gray-900 dark:text-gray-300" on:click={()=> console.log(service)}>{$i18n.t('OpenSI-CoSMIC Settings')}</div>
+			<div class=" mb-2 text-2xl font-bold text-gray-900 dark:text-gray-300">{$i18n.t('OpenSI-CoSMIC Settings')}</div>
 
 			{#if isLoading}
 				<Spinner className="size-6" />
