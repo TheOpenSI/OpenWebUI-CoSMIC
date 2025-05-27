@@ -20,6 +20,7 @@
 	import ResetVectorDBConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import MultiSelect from 'svelte-multiselect'
+    import Spinner from '$lib/components/common/Spinner.svelte';
 
 	const i18n = getContext('i18n');
 
@@ -39,7 +40,6 @@
 	];
 
 	let service = [serviceOptions[0]]; // Default value for "Auto-selection"
-
     let generalLLM = "gpt-4o"; // Default value
 	let generalQuantized = false; // Default for "Quantized"
 	let generalSeed = 0;  // Default for "Random Seed"
@@ -57,6 +57,7 @@
 	let stockfishPath = ""; // Default value for the Stockfish path
 	const formData = new FormData();
 	let isFileSelected = false; // Flag to check if a file is selected
+	let isLoading = false; // Flag to indicate loading state
 
 	// Default value for Retrieve Score Threshold
     let CoSMICRAGTopK = 1;
@@ -178,6 +179,7 @@
 
 
 	const submitHandler = async () => {
+		isLoading = true;
 		let general_llm_name = generalLLM;
 
 		if (isOllamaSelected) {
@@ -237,7 +239,9 @@
 			} else {
 				console.log("Error, updateCoSMICConfig failed.");
 			}
+			isLoading = false;
 		} catch (error) {
+			isLoading = false;
 			console.error("Error updating CoSMIC configs:", error);
 			toast.error(`Error updating CoSMIC configs: ${error}`);
 		}
@@ -245,6 +249,7 @@
 
 
 	onMount(async () => {
+		isLoading = true;
 		const cosmic_configs = await getCoSMICConfig(localStorage.token);
 
 		if (cosmic_configs) {
@@ -262,7 +267,6 @@
 			generalSeed = cosmic_configs["seed"];
 			documentFilePath = cosmic_configs["doc_directory"];
 			service = serviceOptions.filter((option) => cosmic_configs["service"].includes(option.value));
-			console.log("Service selected:", service);
 			
 			queryAnalyserLLM = cosmic_configs["query_analyser"]["llm_name"];
 
@@ -281,6 +285,7 @@
 		    sameAsAbove = cosmic_configs["sameasabove"];
 			openaiApiKey = cosmic_configs["OPENAI_API_KEY"];
 		}
+		isLoading = false;
 	});
 </script>
 
@@ -323,388 +328,392 @@
 >
 	<div class=" space-y-2.5 overflow-y-scroll scrollbar-hidden h-full pr-1.5">
 		<div class="flex flex-col gap-0.5">
-			<div class=" mb-2 text-2xl font-bold text-gray-900 dark:text-gray-300">{$i18n.t('OpenSI-CoSMIC Settings')}</div>
+			<div class=" mb-2 text-2xl font-bold text-gray-900 dark:text-gray-300" on:click={()=> console.log(service)}>{$i18n.t('OpenSI-CoSMIC Settings')}</div>
 
-			<section>
-				<!-- General -->
-				<section class="mb-4">
-					<h2 class="mb-2 text-lg font-medium text-gray-900 dark:text-gray-300">General</h2>
+			{#if isLoading}
+				<Spinner className="size-6" />
+			{:else}
+				<section>
+					<!-- General -->
+					<section class="mb-4">
+						<h2 class="mb-2 text-lg font-medium text-gray-900 dark:text-gray-300">General</h2>
 
-					<div class="field">
-						<label for="llm-select" class="mb-1 text-sm font-medium text-gray-900 dark:text-gray-300">Choose an LLM</label>
-						<div class="flex w-full">
-							<select
-								id="llm-select"
-								bind:value={generalLLM}
-								on:change={updateLLMSelection}
-								class="w-full rounded-lg py-2 px-4 text-sm bg-gray-50 dark:text-gray-300 dark:bg-gray-850 outline-none"
-							>
-								{#each llmOptions as llm}
-									<option
-										value={llm}
-										class="bg-gray-100 dark:bg-gray-700"
-									>
-										{llm}
-									</option>
-								{/each}
-							</select>
-						</div>
-					</div>
-
-					<!-- OpenAI API Key Section -->
-					{#if isGPTModel}
-						<div class="mb-4">
-							<label
-								for="openai-api-key"
-								class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
-							>
-								OpenAI API Key (required for GPT models and will be securely stored)
-							</label>
-							<input
-								id="openai-api-key"
-								type="password"
-								bind:value={openaiApiKey}
-								on:change={updateOpenAIKey}
-								class="block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
-								placeholder="Enter your OpenAI API Key"
-							/>
-						</div>
-					{/if}
-
-					<!-- Ollama Model Input Section -->
-					{#if isOllamaSelected}
-						<div class="mb-4">
-							<label
-								for="ollama-model-name"
-								class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
-							>
-								Pull a model from
-								<a
-									href="https://ollama.com/library"
-									target="_blank"
-									class="text-blue-600 hover:underline dark:text-blue-400"
+						<div class="field">
+							<label for="llm-select" class="mb-1 text-sm font-medium text-gray-900 dark:text-gray-300">Choose an LLM</label>
+							<div class="flex w-full">
+								<select
+									id="llm-select"
+									bind:value={generalLLM}
+									on:change={updateLLMSelection}
+									class="w-full rounded-lg py-2 px-4 text-sm bg-gray-50 dark:text-gray-300 dark:bg-gray-850 outline-none"
 								>
-									Ollama.com
-								</a>
+									{#each llmOptions as llm}
+										<option
+											value={llm}
+											class="bg-gray-100 dark:bg-gray-700"
+										>
+											{llm}
+										</option>
+									{/each}
+								</select>
+							</div>
+						</div>
+
+						<!-- OpenAI API Key Section -->
+						{#if isGPTModel}
+							<div class="mb-4">
+								<label
+									for="openai-api-key"
+									class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
+								>
+									OpenAI API Key (required for GPT models and will be securely stored)
+								</label>
+								<input
+									id="openai-api-key"
+									type="password"
+									bind:value={openaiApiKey}
+									on:change={updateOpenAIKey}
+									class="block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
+									placeholder="Enter your OpenAI API Key"
+								/>
+							</div>
+						{/if}
+
+						<!-- Ollama Model Input Section -->
+						{#if isOllamaSelected}
+							<div class="mb-4">
+								<label
+									for="ollama-model-name"
+									class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
+								>
+									Pull a model from
+									<a
+										href="https://ollama.com/library"
+										target="_blank"
+										class="text-blue-600 hover:underline dark:text-blue-400"
+									>
+										Ollama.com
+									</a>
+								</label>
+								<input
+									id="ollama-model-name"
+									type="text"
+									bind:value={ollamaModelName}
+									on:change={updateOllamaModelName}
+									class="block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
+									placeholder="Enter the name of the Ollama model to download"
+								/>
+								<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+								</p>
+							</div>
+						{/if}
+
+						<!-- Quantized Section -->
+						<div class="mb-4">
+							<label
+								for="quantized"
+								class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
+							>
+								Quantized
+							</label>
+							<div class="flex items-center space-x-2">
+								<input
+									id="quantized"
+									type="checkbox"
+									bind:checked={generalQuantized}
+									on:change={updateQuantized}
+									class="rounded border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 focus:ring-blue-500 focus:border-blue-500"
+								/>
+								<span class="text-sm text-gray-500 dark:text-gray-300">
+									Enable quantized model
+								</span>
+							</div>
+						</div>
+
+						<!-- Random Seed Section -->
+						<div class="mb-4">
+							<label
+								for="random-seed"
+								class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
+							>
+								Random Seed for LLM (enter an integer value no less than 0)
 							</label>
 							<input
-								id="ollama-model-name"
-								type="text"
-								bind:value={ollamaModelName}
-								on:change={updateOllamaModelName}
+								id="random-seed"
+								type="number"
+								min="0"
+								step="1"
+								bind:value={generalSeed}
+								on:change={updategeneralSeed}
 								class="block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
-								placeholder="Enter the name of the Ollama model to download"
 							/>
-							<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-							</p>
 						</div>
-					{/if}
 
-					<!-- Quantized Section -->
-					<div class="mb-4">
-						<label
-							for="quantized"
-							class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
-						>
-							Quantized
-						</label>
-						<div class="flex items-center space-x-2">
+						<!-- Service Selection Section -->
+						<div class="mb-4">
+							<label
+								for="service-selection"
+								class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
+							>
+								Select a Service
+							</label>
+							<MultiSelect
+								id="service-selection"
+								options={serviceOptions}
+								bind:selected={service}
+								outerDivClass="!w-full !p-2.5 !text-sm !rounded-lg !bg-gray-50 !dark:bg-gray-850 !dark:border-gray-700 !dark:text-gray-300 !focus:ring-blue-500 !focus:border-blue-500"
+								liOptionClass="bg-gray-100 dark:bg-gray-700"
+							/>
+							<!-- <select
+								id="service-selection"
+								bind:value={service}
+								class="block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
+							>
+								{#each serviceOptions as option}
+									<option value={option.value}>{option.label}</option>
+								{/each}
+							</select> -->
+						</div>
+					</section>
+				</section>
+
+				<!-- Query Analyser Section -->
+				<section>
+					<h2 class="text-lg font-medium">Query Analyser</h2>
+					<div class="space-y-3">
+						<!-- Same as Above Checkbox -->
+						<div>
 							<input
-								id="quantized"
 								type="checkbox"
-								bind:checked={generalQuantized}
-								on:change={updateQuantized}
-								class="rounded border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 focus:ring-blue-500 focus:border-blue-500"
+								class="rounded"
+								bind:checked={sameAsAbove}
 							/>
-							<span class="text-sm text-gray-500 dark:text-gray-300">
-								Enable quantized model
-							</span>
+							<label class="mb-1.5 text-sm font-medium">Same as Above</label>
 						</div>
-					</div>
 
-					<!-- Random Seed Section -->
-					<div class="mb-4">
-						<label
-							for="random-seed"
-							class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
-						>
-							Random Seed for LLM (enter an integer value no less than 0)
-						</label>
-						<input
-							id="random-seed"
-							type="number"
-							min="0"
-							step="1"
-							bind:value={generalSeed}
-							on:change={updategeneralSeed}
-							class="block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
-						/>
-					</div>
+						<!-- Choose LLM -->
+						<div class="mb-4">
+							<label
+								for="query-analyser-llm-select"
+								class="mb-1 text-sm font-medium text-gray-900 dark:text-gray-300">
+									Choose an LLM
+							</label>
+							<div class="flex w-full">
+								<select
+									id="query-analyser-llm-select"
+									bind:value={queryAnalyserLLM}
+									on:change={updateQueryAnalyserLLMSelection}
+									disabled={sameAsAbove}
+									class="w-full rounded-lg py-2 px-4 text-sm bg-gray-50 dark:text-gray-300 dark:bg-gray-850 outline-none"
+								>
+									{#each llmOptions as llm}
+										<option
+											value={llm}
+											class="bg-gray-100 dark:bg-gray-700"
+										>
+											{llm}
+										</option>
+									{/each}
+								</select>
+							</div>
+						</div>
 
-					<!-- Service Selection Section -->
-					<div class="mb-4">
-						<label
-							for="service-selection"
-							class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
-						>
-							Select a Service
-						</label>
-						<MultiSelect
-							id="service-selection"
-							options={serviceOptions}
-							bind:value={service}
-							outerDivClass="!w-full !p-2.5 !text-sm !rounded-lg !bg-gray-50 !dark:bg-gray-850 !dark:border-gray-700 !dark:text-gray-300 !focus:ring-blue-500 !focus:border-blue-500"
-							liOptionClass="bg-gray-100 dark:bg-gray-700"
-						/>
-						<!-- <select
-							id="service-selection"
-							bind:value={service}
-							class="block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
-						>
-							{#each serviceOptions as option}
-								<option value={option.value}>{option.label}</option>
-							{/each}
-						</select> -->
+						<!-- OpenAI API Key Section -->
+						{#if isQueryAnalyserGPTModel && !isGPTModel}
+							<div class="mb-4">
+								<label
+									for="openai-api-key"
+									class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
+								>
+									OpenAI API Key (required for GPT models and will be securely stored)
+								</label>
+								<input
+									id="openai-api-key"
+									type="password"
+									bind:value={openaiApiKey}
+									on:change={updateOpenAIKey}
+									disabled={sameAsAbove}
+									class="block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
+									placeholder="Enter your OpenAI API Key"
+								/>
+							</div>
+						{/if}
+
+						<!-- Ollama Model Input Section -->
+						{#if isQueryAnalyserOllamaSelected}
+							<div class="mb-4">
+								<label
+									for="query-analyser-ollama-model-name"
+									class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
+								>
+									Pull a model from
+									<a
+										href="https://ollama.com/library"
+										target="_blank"
+										class="text-blue-600 hover:underline dark:text-blue-400"
+									>
+										Ollama.com
+									</a>
+								</label>
+								<input
+									id="query-analyser-ollama-model-name"
+									type="text"
+									bind:value={QueryAnalyserOllamaModelName}
+									disabled={sameAsAbove}
+									class="block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
+									placeholder="Enter the name of the Ollama model to download"
+								/>
+								<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+								</p>
+							</div>
+						{/if}
+
+						<!-- Quantized -->
+						<div class="mb-4">
+							<label
+								for="quantized_query_analyser"
+								class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
+							>
+								Quantized
+							</label>
+							<div class="flex items-center space-x-2">
+								<input
+									id="quantized_query_analyser"
+									type="checkbox"
+									bind:checked={queryAnalyserQuantized}
+									class="rounded border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 focus:ring-blue-500 focus:border-blue-500"
+									disabled={sameAsAbove}
+								/>
+								<span class="text-sm text-gray-500 dark:text-gray-300">
+									Enable quantized model
+								</span>
+							</div>
+						</div>
 					</div>
 				</section>
-			</section>
 
-			<!-- Query Analyser Section -->
-			<section>
-				<h2 class="text-lg font-medium">Query Analyser</h2>
-				<div class="space-y-3">
-					<!-- Same as Above Checkbox -->
-					<div>
-						<input
-							type="checkbox"
-							class="rounded"
-							bind:checked={sameAsAbove}
-						/>
-						<label class="mb-1.5 text-sm font-medium">Same as Above</label>
-					</div>
+				<!-- Chess Section -->
+				<section class="mb-4">
+					<h2 class="mb-2 text-lg font-medium text-gray-900 dark:text-gray-300">Chess</h2>
 
-					<!-- Choose LLM -->
+					<!-- Stockfish Path Subsection -->
 					<div class="mb-4">
 						<label
-							for="query-analyser-llm-select"
-							class="mb-1 text-sm font-medium text-gray-900 dark:text-gray-300">
-								Choose an LLM
-						</label>
-						<div class="flex w-full">
-							<select
-								id="query-analyser-llm-select"
-								bind:value={queryAnalyserLLM}
-								on:change={updateQueryAnalyserLLMSelection}
-								disabled={sameAsAbove}
-								class="w-full rounded-lg py-2 px-4 text-sm bg-gray-50 dark:text-gray-300 dark:bg-gray-850 outline-none"
-							>
-								{#each llmOptions as llm}
-									<option
-										value={llm}
-										class="bg-gray-100 dark:bg-gray-700"
-									>
-										{llm}
-									</option>
-								{/each}
-							</select>
-						</div>
-					</div>
-
-					<!-- OpenAI API Key Section -->
-					{#if isQueryAnalyserGPTModel && !isGPTModel}
-						<div class="mb-4">
-							<label
-								for="openai-api-key"
-								class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
-							>
-								OpenAI API Key (required for GPT models and will be securely stored)
-							</label>
-							<input
-								id="openai-api-key"
-								type="password"
-								bind:value={openaiApiKey}
-								on:change={updateOpenAIKey}
-								disabled={sameAsAbove}
-								class="block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
-								placeholder="Enter your OpenAI API Key"
-							/>
-						</div>
-					{/if}
-
-					<!-- Ollama Model Input Section -->
-					{#if isQueryAnalyserOllamaSelected}
-						<div class="mb-4">
-							<label
-								for="query-analyser-ollama-model-name"
-								class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
-							>
-								Pull a model from
-								<a
-									href="https://ollama.com/library"
-									target="_blank"
-									class="text-blue-600 hover:underline dark:text-blue-400"
-								>
-									Ollama.com
-								</a>
-							</label>
-							<input
-								id="query-analyser-ollama-model-name"
-								type="text"
-								bind:value={QueryAnalyserOllamaModelName}
-								disabled={sameAsAbove}
-								class="block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
-								placeholder="Enter the name of the Ollama model to download"
-							/>
-							<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-							</p>
-						</div>
-					{/if}
-
-					<!-- Quantized -->
-					<div class="mb-4">
-						<label
-							for="quantized_query_analyser"
+							for="stockfish-path"
 							class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
 						>
-							Quantized
+							Select the Stockfish executable file
 						</label>
 						<div class="flex items-center space-x-2">
+							<!-- Text input to display the selected path -->
 							<input
-								id="quantized_query_analyser"
-								type="checkbox"
-								bind:checked={queryAnalyserQuantized}
-								class="rounded border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 focus:ring-blue-500 focus:border-blue-500"
-								disabled={sameAsAbove}
+								id="stockfish-path"
+								type="text"
+								bind:value={stockfishPath}
+								class="flex-1 block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
+								readonly
+								placeholder="No path selected"
 							/>
-							<span class="text-sm text-gray-500 dark:text-gray-300">
-								Enable quantized model
-							</span>
-						</div>
-					</div>
-				</div>
-			</section>
-
-			<!-- Chess Section -->
-			<section class="mb-4">
-  			    <h2 class="mb-2 text-lg font-medium text-gray-900 dark:text-gray-300">Chess</h2>
-
-				<!-- Stockfish Path Subsection -->
-				<div class="mb-4">
-					<label
-						for="stockfish-path"
-						class="block mb-1 text-sm font-medium text-gray-900 dark:text-gray-300"
-					>
-						Select the Stockfish executable file
-					</label>
-					<div class="flex items-center space-x-2">
-						<!-- Text input to display the selected path -->
-						<input
-							id="stockfish-path"
-							type="text"
-							bind:value={stockfishPath}
-							class="flex-1 block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
-							readonly
-							placeholder="No path selected"
-						/>
-						<!-- Button to select the Stockfish executable -->
-						<button
-							type="button"
-							class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:bg-blue-500 dark:hover:bg-blue-600 focus:outline-none dark:focus:ring-blue-800"
-							on:click={() => document.getElementById('stockfish-input').click()}
-						>
-							Browse
-						</button>
-					</div>
-					<!-- Hidden file input -->
-					<input
-						id="stockfish-input"
-						type="file"
-						class="hidden"
-						on:change={handleStockfishSelection}
-					/>
-				</div>
-			</section>
-
-			<!-- RAG -->
-			<section class="mb-4">
-			    <h2 class="mb-2 text-lg font-medium text-gray-900 dark:text-gray-300">RAG</h2>
-
-				<div class="flex flex-col w-full">
-					<div class="flex items-center space-x-1.5 mb-1">
-						<div class="text-xs font-medium min-w-fit text-gray-900 dark:text-gray-300">
-							{$i18n.t('Top-K')}
-						</div>
-						<Tooltip content={$i18n.t('Specifies how many of the most similar results are fetched from the vector database.')}>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke-width="1.5"
-								stroke="currentColor"
-								class="w-5 h-5 text-gray-700 dark:text-gray-300"
+							<!-- Button to select the Stockfish executable -->
+							<button
+								type="button"
+								class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:bg-blue-500 dark:hover:bg-blue-600 focus:outline-none dark:focus:ring-blue-800"
+								on:click={() => document.getElementById('stockfish-input').click()}
 							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"
-								/>
-							</svg>
-						</Tooltip>
-					</div>
-
-					<div class="self-center w-full">
+								Browse
+							</button>
+						</div>
+						<!-- Hidden file input -->
 						<input
-							class="w-full rounded-lg py-1.5 px-4 text-sm bg-gray-50 dark:text-gray-300 dark:bg-gray-850 outline-none"
+							id="stockfish-input"
+							type="file"
+							class="hidden"
+							on:change={handleStockfishSelection}
+						/>
+					</div>
+				</section>
+
+				<!-- RAG -->
+				<section class="mb-4">
+					<h2 class="mb-2 text-lg font-medium text-gray-900 dark:text-gray-300">RAG</h2>
+
+					<div class="flex flex-col w-full">
+						<div class="flex items-center space-x-1.5 mb-1">
+							<div class="text-xs font-medium min-w-fit text-gray-900 dark:text-gray-300">
+								{$i18n.t('Top-K')}
+							</div>
+							<Tooltip content={$i18n.t('Specifies how many of the most similar results are fetched from the vector database.')}>
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke-width="1.5"
+									stroke="currentColor"
+									class="w-5 h-5 text-gray-700 dark:text-gray-300"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"
+									/>
+								</svg>
+							</Tooltip>
+						</div>
+
+						<div class="self-center w-full">
+							<input
+								class="w-full rounded-lg py-1.5 px-4 text-sm bg-gray-50 dark:text-gray-300 dark:bg-gray-850 outline-none"
+								type="number"
+								placeholder={$i18n.t('Enter Top K')}
+								bind:value={CoSMICRAGTopK}
+								autocomplete="off"
+								min="0"
+							/>
+						</div>
+					</div>
+				
+
+					<!-- Retrieve Score Threshold Subsection -->
+					<div class="mb-4">
+						<!-- Flex container for title and tooltip -->
+						<div class="flex items-center space-x-1.5 mb-1">
+							<label
+								for="retrieve-score-threshold"
+								class="text-sm font-medium text-gray-900 dark:text-gray-300"
+							>
+								Retrieve Score Threshold (enter a value between 0 and 1, default is 0.7)
+							</label>
+							<Tooltip content={$i18n.t('Defines the minimum similarity score a document must have to be included in the retrieved results. A higher threshold ensures more relevant results, while a lower threshold increases recall by including less relevant results. Recommended range: 0.5 - 0.9.')}>
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke-width="1.5"
+									stroke="currentColor"
+									class="w-5 h-5 text-gray-700 dark:text-gray-300"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"
+									/>
+								</svg>
+							</Tooltip>
+						</div>
+
+						<input
+							id="retrieve-score-threshold"
 							type="number"
-							placeholder={$i18n.t('Enter Top K')}
-							bind:value={CoSMICRAGTopK}
-							autocomplete="off"
 							min="0"
+							max="1"
+							step="0.01"
+							bind:value={CoSMICRAGRetrieveScoreThreshold}
+							on:change={updateCoSMICRAGRetrieveScoreThreshold}
+							class="block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
 						/>
 					</div>
-				</div>
-			
-
-				<!-- Retrieve Score Threshold Subsection -->
-				<div class="mb-4">
-					<!-- Flex container for title and tooltip -->
-					<div class="flex items-center space-x-1.5 mb-1">
-						<label
-							for="retrieve-score-threshold"
-							class="text-sm font-medium text-gray-900 dark:text-gray-300"
-						>
-							Retrieve Score Threshold (enter a value between 0 and 1, default is 0.7)
-						</label>
-						<Tooltip content={$i18n.t('Defines the minimum similarity score a document must have to be included in the retrieved results. A higher threshold ensures more relevant results, while a lower threshold increases recall by including less relevant results. Recommended range: 0.5 - 0.9.')}>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke-width="1.5"
-								stroke="currentColor"
-								class="w-5 h-5 text-gray-700 dark:text-gray-300"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"
-								/>
-							</svg>
-						</Tooltip>
-					</div>
-
-					<input
-						id="retrieve-score-threshold"
-						type="number"
-						min="0"
-						max="1"
-						step="0.01"
-						bind:value={CoSMICRAGRetrieveScoreThreshold}
-						on:change={updateCoSMICRAGRetrieveScoreThreshold}
-						class="block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
-					/>
-				</div>
-		    </section>
+				</section>
+			{/if}
 		</div>
 	</div>
 
@@ -712,6 +721,7 @@
 		<button
 			class="px-3.5 py-1.5 text-sm font-medium bg-black hover:bg-gray-900 text-white dark:bg-white dark:text-black dark:hover:bg-gray-100 transition rounded-full"
 			type="submit"
+			disabled={isLoading}
 		>
 			{$i18n.t('Save')}
 		</button>
