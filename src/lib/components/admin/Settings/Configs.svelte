@@ -19,7 +19,7 @@
 	import ResetUploadDirConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
 	import ResetVectorDBConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
-	import MultiSelect from 'svelte-multiselect'
+	// import MultiSelect from 'svelte-multiselect'
     import Spinner from '$lib/components/common/Spinner.svelte';
 
 	const i18n = getContext('i18n');
@@ -39,7 +39,9 @@
 		{ label: "General Question Answering", value: 3 }
 	];
 
-	let service = [serviceOptions[0]]; // Default value for "Auto-selection"
+	let service = -1;
+
+	// let service = [serviceOptions[0]]; // Default value for "Auto-selection"
     let generalLLM = "gpt-4o"; // Default value
 	let generalQuantized = false; // Default for "Quantized"
 	let generalSeed = 0;  // Default for "Random Seed"
@@ -203,7 +205,8 @@
 				seed: generalSeed,
 				doc_directory: documentFilePath,  // TODO
 				document_path: documentFilePath,  // TODO
-				service: service.map(s => s.value),
+				// service: service.map(s => s.value),
+				service: service,
 				sameasabove: sameAsAbove,
 				query_analyser: {
 					llm_name: query_analyser_llm_name,
@@ -266,7 +269,8 @@
 			generalQuantized = cosmic_configs["is_quantized"];
 			generalSeed = cosmic_configs["seed"];
 			documentFilePath = cosmic_configs["doc_directory"];
-			service = serviceOptions.filter((option) => cosmic_configs["service"].includes(option.value));
+			// service = serviceOptions.filter((option) => cosmic_configs["service"].includes(option.value));
+			service = cosmic_configs["service"];
 			
 			queryAnalyserLLM = cosmic_configs["query_analyser"]["llm_name"];
 
@@ -457,14 +461,14 @@
 							>
 								Select a Service
 							</label>
-							<MultiSelect
+							<!-- <MultiSelect
 								id="service-selection"
 								options={serviceOptions}
 								bind:selected={service}
 								outerDivClass="!w-full !p-2.5 !text-sm !rounded-lg !bg-gray-50 !dark:bg-gray-850 !dark:border-gray-700 !dark:text-gray-300 !focus:ring-blue-500 !focus:border-blue-500"
 								liOptionClass="bg-gray-100 dark:bg-gray-700"
-							/>
-							<!-- <select
+							/> -->
+							<select
 								id="service-selection"
 								bind:value={service}
 								class="block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
@@ -472,7 +476,7 @@
 								{#each serviceOptions as option}
 									<option value={option.value}>{option.label}</option>
 								{/each}
-							</select> -->
+							</select>
 						</div>
 					</section>
 				</section>
