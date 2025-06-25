@@ -11,6 +11,7 @@
 
 	import {
 		getCoSMICConfig,
+		getCoSMICServices,
 		updateCoSMICConfig,
 		uploadChessFile
 	} from '$lib/apis/cosmic';
@@ -31,15 +32,14 @@
 		"ollama"
     ];
 
-	const serviceOptions = [
-		{ label: "Auto-selection (default)", value: -1 },
-		{ label: "Chess", value: 0 },
-		{ label: "Update Vector Database", value: 1 },
-		{ label: "Code Generation", value: 2 },
-		{ label: "General Question Answering", value: 3 }
-	];
+	type serviceOption = {
+		title: string;
+		value: number;
+	};
 
-	let service = -1;
+	let serviceOptions: serviceOption[] = [];
+
+	let service: number;
 
 	// let service = [serviceOptions[0]]; // Default value for "Auto-selection"
     let generalLLM = "gpt-4o"; // Default value
@@ -253,7 +253,9 @@
 
 	onMount(async () => {
 		isLoading = true;
-		const cosmic_configs = await getCoSMICConfig(localStorage.token);
+		let cosmic_configs;
+
+		[cosmic_configs, serviceOptions] = await Promise.all([getCoSMICConfig(localStorage.token), getCoSMICServices(localStorage.token)]);
 
 		if (cosmic_configs) {
 			generalLLM = cosmic_configs["llm_name"];
@@ -474,7 +476,7 @@
 								class="block w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-850 dark:border-gray-700 dark:text-gray-300 focus:ring-blue-500 focus:border-blue-500"
 							>
 								{#each serviceOptions as option}
-									<option value={option.value}>{option.label}</option>
+									<option value={option.value}>{option.title}</option>
 								{/each}
 							</select>
 						</div>

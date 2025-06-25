@@ -224,7 +224,7 @@ type PromptSuggestion = {
 	title: [string, string];
 };
 
-type SessionUser = {
+export type SessionUser = {
 	id: string;
 	email: string;
 	name: string;

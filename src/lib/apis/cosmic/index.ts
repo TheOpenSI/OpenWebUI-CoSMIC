@@ -1,4 +1,15 @@
 import { COSMIC_API_BASE_URL, COSMIC_CONFIG_API_BASE_URL } from '$lib/constants';
+import { user, type SessionUser } from '$lib/stores';
+
+let userData: SessionUser | undefined = undefined;
+
+user.subscribe((value) => {
+	if (value) {
+		userData = value;
+	} else {
+		console.log('User store is empty');
+	}
+});
 
 export const getCoSMICConfig = async (token: string) => {
 	let error = null;
@@ -32,6 +43,15 @@ type CoSMICConfigForm = {
 
 export const updateCoSMICConfig = async (token: string, payload: CoSMICConfigForm) => {
 	let error = null;
+
+	payload = {
+		...payload,
+		user: {
+			id: userData?.id ?? '',
+			role: userData?.role ?? '',
+			email: userData?.email ?? ''
+		}
+	};
 
 	const res = await fetch(`${COSMIC_CONFIG_API_BASE_URL}/config/update`, {
 		method: 'POST',
@@ -69,6 +89,33 @@ export const uploadChessFile = async (token: string, formData: FormData) => {
 			Authorization: `Bearer ${token}`
 		},
 		body: formData
+	})
+		.then(async (res) => {
+			if (!res.ok) throw await res.json();
+			return res.json();
+		})
+		.catch((err) => {
+			console.log(err);
+			error = err.detail;
+			return null;
+		});
+
+	if (error) {
+		throw error;
+	}
+
+	return res;
+};
+
+export const getCoSMICServices = async (token: string) => {
+	let error = null;
+
+	const res = await fetch(`${COSMIC_CONFIG_API_BASE_URL}/services`, {
+		method: 'GET',
+		headers: {
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${token}`
+		}
 	})
 		.then(async (res) => {
 			if (!res.ok) throw await res.json();
