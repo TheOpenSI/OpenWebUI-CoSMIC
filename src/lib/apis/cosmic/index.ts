@@ -45,7 +45,7 @@ export const updateCoSMICConfig = async (token: string, payload: CoSMICConfigFor
 	let error = null;
 
 	payload = {
-		...payload,
+		config: payload,
 		user: {
 			id: userData?.id ?? '',
 			role: userData?.role ?? '',
