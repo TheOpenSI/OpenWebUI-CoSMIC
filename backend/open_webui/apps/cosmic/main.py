@@ -9,7 +9,7 @@ import shutil
 
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -198,7 +198,8 @@ class ConfigUpdateForm(BaseModel):
     seed: int
     doc_directory: str
     document_path: str
-    service: int
+    service: List[int]
+    # service: int
     sameasabove: bool
     query_analyser: QueryQnalyserConfig
     rag: RAGConfig
