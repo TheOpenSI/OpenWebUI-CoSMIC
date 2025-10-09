@@ -559,6 +559,8 @@
 				</section>
 
 				<!-- Query Analyser Section -->
+
+				
 				<section>
 					<h2 class="text-lg font-medium">Query Analyser</h2>
 					<div class="space-y-3">
