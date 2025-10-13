@@ -6,7 +6,7 @@ import shutil
 import os, yaml
 import dotenv
 from pathlib import Path
-from typing import Literal, Optional, overload
+from typing import List, Literal, Optional, overload
 
 import aiohttp
 from aiocache import cached
@@ -158,7 +158,8 @@ class ConfigUpdateForm(BaseModel):
     seed: int
     doc_directory: str
     document_path: str
-    service: int
+    service: List[int]
+    # service: int
     sameasabove: bool
     query_analyser: QueryQnalyserConfig
     rag: RAGConfig
