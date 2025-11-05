@@ -32,6 +32,7 @@ from open_webui.utils.utils import (
     get_password_hash,
 )
 from open_webui.utils.webhook import post_webhook
+from open_webui.utils.cosmic_sync import trigger_cosmic_sync
 
 router = APIRouter()
 
@@ -293,6 +294,11 @@ async def add_user(form_data: AddUserForm, user=Depends(get_admin_user)):
 
         if user:
             token = create_token(data={"id": user.id})
+            # Best-effort immediate sync of users into CoSMIC
+            try:
+                trigger_cosmic_sync("users")
+            except Exception:
+                pass
             return {
                 "token": token,
                 "token_type": "Bearer",

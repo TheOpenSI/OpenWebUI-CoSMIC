@@ -8,6 +8,7 @@ from open_webui.apps.webui.models.models import (
 )
 from open_webui.constants import ERROR_MESSAGES
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from open_webui.utils.cosmic_sync import trigger_cosmic_sync
 from open_webui.utils.utils import get_admin_user, get_verified_user
 
 router = APIRouter()
@@ -52,6 +53,11 @@ async def add_new_model(
         model = Models.insert_new_model(form_data, user.id)
 
         if model:
+            # Best-effort immediate sync of LLMs into CoSMIC
+            try:
+                trigger_cosmic_sync("llms")
+            except Exception:
+                pass
             return model
         else:
             raise HTTPException(
@@ -75,11 +81,20 @@ async def update_model_by_id(
     model = Models.get_model_by_id(id)
     if model:
         model = Models.update_model_by_id(id, form_data)
+        # Best-effort immediate sync of LLMs into CoSMIC
+        try:
+            trigger_cosmic_sync("llms")
+        except Exception:
+            pass
         return model
     else:
         if form_data.id in request.app.state.MODELS:
             model = Models.insert_new_model(form_data, user.id)
             if model:
+                try:
+                    trigger_cosmic_sync("llms")
+                except Exception:
+                    pass
                 return model
             else:
                 raise HTTPException(
@@ -101,4 +116,9 @@ async def update_model_by_id(
 @router.delete("/delete", response_model=bool)
 async def delete_model_by_id(id: str, user=Depends(get_admin_user)):
     result = Models.delete_model_by_id(id)
+    # Best-effort immediate sync of LLMs into CoSMIC
+    try:
+        trigger_cosmic_sync("llms")
+    except Exception:
+        pass
     return result
