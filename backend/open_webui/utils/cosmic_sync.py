@@ -29,7 +29,11 @@ log.setLevel(SRC_LOG_LEVELS.get("WEBHOOK", logging.INFO))
 def _get_cosmic_base_url() -> str:
     base = os.environ.get("OPENSI_COSMIC_API_BASE_URL")
     if base and base.strip():
-        return base.rstrip("/")
+        base = base.rstrip("/")
+        # If someone set localhost/127.0.0.1 inside the container, prefer service name
+        if "localhost" in base or "127.0.0.1" in base:
+            return "http://cosmic:3000"
+        return base
     # Default to the Docker service name reachable from the same network
     return "http://cosmic:3000"
 
