@@ -233,6 +233,12 @@ async def signup(request: Request, response: Response, form_data: SignupForm):
                 expires_delta=parse_duration(request.app.state.config.JWT_EXPIRES_IN),
             )
 
+            # Best-effort immediate sync of users into CoSMIC on signup
+            try:
+                trigger_cosmic_sync("users")
+            except Exception:
+                pass
+
             # Set the cookie token
             response.set_cookie(
                 key="token",
