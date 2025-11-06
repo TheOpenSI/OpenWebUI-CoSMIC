@@ -5,6 +5,7 @@ from typing import Optional
 
 from open_webui.utils.auth import get_admin_user, get_verified_user
 from open_webui.config import get_config, save_config
+from open_webui.utils.cosmic_sync import trigger_cosmic_sync
 from open_webui.config import BannerModel
 
 
@@ -197,6 +198,12 @@ async def set_models_config(
 ):
     request.app.state.config.DEFAULT_MODELS = form_data.DEFAULT_MODELS
     request.app.state.config.MODEL_ORDER_LIST = form_data.MODEL_ORDER_LIST
+    # Best-effort: notify CoSMIC to sync LLMs immediately on model config changes
+    try:
+        trigger_cosmic_sync("llms")
+    except Exception:
+        # Do not fail admin action on webhook issues
+        pass
     return {
         "DEFAULT_MODELS": request.app.state.config.DEFAULT_MODELS,
         "MODEL_ORDER_LIST": request.app.state.config.MODEL_ORDER_LIST,

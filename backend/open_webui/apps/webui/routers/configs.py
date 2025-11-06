@@ -5,6 +5,7 @@ from open_webui.utils.utils import get_admin_user, get_verified_user
 
 
 from open_webui.config import get_config, save_config
+from open_webui.utils.cosmic_sync import trigger_cosmic_sync
 
 router = APIRouter()
 
@@ -57,6 +58,11 @@ async def set_global_default_models(
     request: Request, form_data: SetDefaultModelsForm, user=Depends(get_admin_user)
 ):
     request.app.state.config.DEFAULT_MODELS = form_data.models
+    # Best-effort: notify CoSMIC to sync LLMs immediately on default model change
+    try:
+        trigger_cosmic_sync("llms")
+    except Exception:
+        pass
     return request.app.state.config.DEFAULT_MODELS
 
 

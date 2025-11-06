@@ -44,6 +44,7 @@ from open_webui.env import (
 from open_webui.utils.misc import parse_duration
 from open_webui.utils.auth import get_password_hash, create_token
 from open_webui.utils.webhook import post_webhook
+from open_webui.utils.cosmic_sync import trigger_cosmic_sync
 
 from open_webui.env import SRC_LOG_LEVELS, GLOBAL_LOG_LEVEL
 
@@ -378,6 +379,12 @@ class OAuthManager:
                     role=role,
                     oauth_sub=provider_sub,
                 )
+
+                # Best-effort immediate sync of users into CoSMIC on OAuth signup
+                try:
+                    trigger_cosmic_sync("users")
+                except Exception:
+                    pass
 
                 if auth_manager_config.WEBHOOK_URL:
                     post_webhook(

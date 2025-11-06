@@ -14,6 +14,7 @@ from open_webui.constants import ERROR_MESSAGES
 from open_webui.env import SRC_LOG_LEVELS
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
+from open_webui.utils.cosmic_sync import trigger_cosmic_sync
 from open_webui.utils.utils import get_admin_user, get_password_hash, get_verified_user
 
 log = logging.getLogger(__name__)
@@ -57,7 +58,13 @@ async def update_user_permissions(
 @router.post("/update/role", response_model=Optional[UserModel])
 async def update_user_role(form_data: UserRoleUpdateForm, user=Depends(get_admin_user)):
     if user.id != form_data.id and form_data.id != Users.get_first_user().id:
-        return Users.update_user_role_by_id(form_data.id, form_data.role)
+        updated = Users.update_user_role_by_id(form_data.id, form_data.role)
+        # Best-effort immediate sync of users into CoSMIC
+        try:
+            trigger_cosmic_sync("users")
+        except Exception:
+            pass
+        return updated
 
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
@@ -93,6 +100,10 @@ async def update_user_settings_by_session_user(
 ):
     user = Users.update_user_by_id(user.id, {"settings": form_data.model_dump()})
     if user:
+        try:
+            trigger_cosmic_sync("users")
+        except Exception:
+            pass
         return user.settings
     else:
         raise HTTPException(
@@ -134,6 +145,10 @@ async def update_user_info_by_session_user(
 
         user = Users.update_user_by_id(user.id, {"info": {**user.info, **form_data}})
         if user:
+            try:
+                trigger_cosmic_sync("users")
+            except Exception:
+                pass
             return user.info
         else:
             raise HTTPException(
@@ -221,6 +236,10 @@ async def update_user_by_id(
         )
 
         if updated_user:
+            try:
+                trigger_cosmic_sync("users")
+            except Exception:
+                pass
             return updated_user
 
         raise HTTPException(
@@ -245,6 +264,10 @@ async def delete_user_by_id(user_id: str, user=Depends(get_admin_user)):
         result = Auths.delete_auth_by_id(user_id)
 
         if result:
+            try:
+                trigger_cosmic_sync("users")
+            except Exception:
+                pass
             return True
 
         raise HTTPException(

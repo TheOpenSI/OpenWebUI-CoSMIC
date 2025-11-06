@@ -44,6 +44,7 @@ from open_webui.utils.auth import (
 )
 from open_webui.utils.webhook import post_webhook
 from open_webui.utils.access_control import get_permissions
+from open_webui.utils.cosmic_sync import trigger_cosmic_sync
 
 from typing import Optional, List
 
@@ -477,6 +478,12 @@ async def signup(request: Request, response: Response, form_data: SignupForm):
                 expires_delta=expires_delta,
             )
 
+            # Best-effort immediate sync of users into CoSMIC on signup
+            try:
+                trigger_cosmic_sync("users")
+            except Exception:
+                pass
+
             datetime_expires_at = (
                 datetime.datetime.fromtimestamp(expires_at, datetime.timezone.utc)
                 if expires_at
@@ -583,6 +590,12 @@ async def add_user(form_data: AddUserForm, user=Depends(get_admin_user)):
 
         if user:
             token = create_token(data={"id": user.id})
+            # Best-effort immediate sync of users into CoSMIC when admin adds a user
+            try:
+                from open_webui.utils.cosmic_sync import trigger_cosmic_sync
+                trigger_cosmic_sync("users")
+            except Exception:
+                pass
             return {
                 "token": token,
                 "token_type": "Bearer",
